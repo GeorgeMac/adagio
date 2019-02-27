@@ -1,0 +1,392 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/georgemac/adagio/pkg/graph/diff.go (0.0%)</option>
+				
+				<option value="file1">github.com/georgemac/adagio/pkg/graph/graph.go (77.9%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package graph
+
+import (
+        "fmt"
+        "sort"
+
+        "github.com/kr/pretty"
+)
+
+func Diff(a, b *Graph) []string <span class="cov0" title="0">{
+        type graph struct {
+                nodes []string
+                edges []string
+        }
+
+        flatten := func(g *Graph, dest *graph) </span><span class="cov0" title="0">{
+                for src, eset := range g.forward </span><span class="cov0" title="0">{
+                        dest.nodes = append(dest.nodes, fmt.Sprintf("%v", src))
+
+                        for target, _ := range eset </span><span class="cov0" title="0">{
+                                dest.edges = append(dest.edges, fmt.Sprintf("%v to %v", src, target))
+                        }</span>
+                }
+
+                <span class="cov0" title="0">sort.Strings(dest.nodes)
+                sort.Strings(dest.edges)</span>
+        }
+
+        <span class="cov0" title="0">var ag, bg graph
+
+        flatten(a, &amp;ag)
+        flatten(b, &amp;bg)
+
+        return pretty.Diff(ag, bg)</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package graph
+
+import (
+        "github.com/pkg/errors"
+)
+
+var (
+        ErrDuplicateNode       = errors.New("node already exists in graph")
+        ErrMissingNode         = errors.New("node is not present in graph")
+        ErrCannotContainCycles = errors.New("cannot contain cycles")
+)
+
+type (
+        Node    interface{}
+        nodeSet map[Node]struct{}
+        edgeSet map[Node]nodeSet
+)
+
+type Graph struct {
+        forward, reverse edgeSet
+}
+
+func New(nodes ...Node) *Graph <span class="cov8" title="1">{
+        graph := &amp;Graph{
+                forward: edgeSet{},
+                reverse: edgeSet{},
+        }
+
+        graph.AddNodes(nodes...)
+
+        return graph
+}</span>
+
+func (g *Graph) clone() *Graph <span class="cov0" title="0">{
+        return &amp;Graph{
+                forward: g.forward.clone(),
+                reverse: g.reverse.clone(),
+        }
+}</span>
+
+func (g *Graph) initializeIfEmpty() <span class="cov8" title="1">{
+        if g.forward == nil </span><span class="cov0" title="0">{
+                g.forward = edgeSet{}
+        }</span>
+
+        <span class="cov8" title="1">if g.reverse == nil </span><span class="cov0" title="0">{
+                g.reverse = edgeSet{}
+        }</span>
+}
+
+func (g *Graph) AddNodes(nodes ...Node) error <span class="cov8" title="1">{
+        g.initializeIfEmpty()
+
+        for _, n := range nodes </span><span class="cov8" title="1">{
+                if err := g.forward.addNode(n); err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov8" title="1">if err := g.reverse.addNode(n); err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+        }
+
+        <span class="cov8" title="1">return nil</span>
+}
+
+func (g *Graph) IsRoot(n Node) (bool, error) <span class="cov8" title="1">{
+        if !g.reverse.present(n) </span><span class="cov0" title="0">{
+                return false, wrapMissingErr(n)
+        }</span>
+
+        <span class="cov8" title="1">return len(g.reverse[n]) == 0, nil</span>
+}
+
+func (g *Graph) IsLeaf(n Node) (bool, error) <span class="cov8" title="1">{
+        if !g.forward.present(n) </span><span class="cov0" title="0">{
+                return false, wrapMissingErr(n)
+        }</span>
+
+        <span class="cov8" title="1">return len(g.forward[n]) == 0, nil</span>
+}
+
+func (g *Graph) Outgoing(n Node) (nodes map[Node]struct{}, err error) <span class="cov8" title="1">{
+        if !g.forward.present(n) </span><span class="cov0" title="0">{
+                return nil, wrapMissingErr(n)
+        }</span>
+
+        <span class="cov8" title="1">return g.forward[n].clone(), nil</span>
+}
+
+func (g *Graph) Incoming(n Node) (nodes map[Node]struct{}, err error) <span class="cov8" title="1">{
+        if !g.reverse.present(n) </span><span class="cov0" title="0">{
+                return nil, wrapMissingErr(n)
+        }</span>
+
+        <span class="cov8" title="1">return g.reverse[n].clone(), nil</span>
+}
+
+func (g *Graph) Connect(from, to Node) error <span class="cov8" title="1">{
+        g.initializeIfEmpty()
+
+        if err := g.forward.connect(from, to); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">return g.reverse.connect(to, from)</span>
+}
+
+func (g *Graph) Cycles() (cycles [][]Node) <span class="cov8" title="1">{
+        for _, cc := range g.StronglyConnectedComponents() </span><span class="cov8" title="1">{
+                if len(cc) &gt; 1 </span><span class="cov8" title="1">{
+                        cycles = append(cycles, cc)
+                }</span>
+        }
+
+        <span class="cov8" title="1">return</span>
+}
+
+func (g *Graph) StronglyConnectedComponents() (components [][]Node) <span class="cov8" title="1">{
+        var (
+                sorted = g.TopologicalSort()
+                set    = g.reverse.clone()
+        )
+
+        for _, node := range sorted </span><span class="cov8" title="1">{
+                var dest []Node
+                dest = dfs(set, node, dest)
+                components = append(components, dest)
+        }</span>
+
+        <span class="cov8" title="1">return</span>
+}
+
+func (g *Graph) TopologicalSort() []Node <span class="cov8" title="1">{
+        return reverse(g.dfsForward())
+}</span>
+
+type WalkDirection uint8
+
+const (
+        Backwards WalkDirection = iota
+        Forwards
+)
+
+type VisitFunc func(Node)
+
+func (g *Graph) Walk(dir WalkDirection, fn VisitFunc) <span class="cov0" title="0">{
+        direction := g.dfsForward
+        if dir &gt; Backwards </span><span class="cov0" title="0">{
+                direction = g.TopologicalSort
+        }</span>
+
+        <span class="cov0" title="0">for _, node := range direction() </span><span class="cov0" title="0">{
+                fn(node)
+        }</span>
+}
+
+func (g *Graph) dfsForward() []Node <span class="cov8" title="1">{
+        var (
+                nodes = make([]Node, 0, len(g.forward))
+                set   = g.forward.clone()
+        )
+
+        for node := range set </span><span class="cov8" title="1">{
+                nodes = dfs(set, node, nodes)
+        }</span>
+
+        <span class="cov8" title="1">return nodes</span>
+}
+
+func reverse(nodes []Node) []Node <span class="cov8" title="1">{
+        for i := 0; i &lt; len(nodes)/2; i++ </span><span class="cov8" title="1">{
+                opp := len(nodes) - 1 - i
+                nodes[i], nodes[opp] = nodes[opp], nodes[i]
+        }</span>
+
+        <span class="cov8" title="1">return nodes</span>
+}
+
+func dfs(all edgeSet, from Node, dest []Node) []Node <span class="cov8" title="1">{
+        targets, ok := all.remove(from)
+        if !ok </span><span class="cov8" title="1">{
+                return dest
+        }</span>
+
+        <span class="cov8" title="1">for node, _ := range targets </span><span class="cov8" title="1">{
+                dest = dfs(all, node, dest)
+        }</span>
+
+        <span class="cov8" title="1">return append(dest, from)</span>
+}
+
+func (e edgeSet) present(n Node) (present bool) <span class="cov8" title="1">{
+        _, present = e[n]
+        return
+}</span>
+
+func (e edgeSet) connect(from, to Node) error <span class="cov8" title="1">{
+        if !e.present(from) </span><span class="cov0" title="0">{
+                return wrapMissingErr(from)
+        }</span>
+
+        <span class="cov8" title="1">if !e.present(to) </span><span class="cov0" title="0">{
+                return wrapMissingErr(to)
+        }</span>
+
+        <span class="cov8" title="1">e[from][to] = struct{}{}
+
+        return nil</span>
+}
+
+func (e edgeSet) addNode(n Node) error <span class="cov8" title="1">{
+        if e.present(n) </span><span class="cov0" title="0">{
+                return errors.Wrapf(ErrDuplicateNode, "node %q", n)
+        }</span>
+
+        <span class="cov8" title="1">e[n] = nodeSet{}
+
+        return nil</span>
+}
+
+func (e edgeSet) remove(n Node) (set nodeSet, ok bool) <span class="cov8" title="1">{
+        set, ok = e[n]
+        if ok </span><span class="cov8" title="1">{
+                delete(e, n)
+        }</span>
+
+        <span class="cov8" title="1">return</span>
+}
+
+func (s edgeSet) clone() edgeSet <span class="cov8" title="1">{
+        dest := edgeSet{}
+        for n, e := range s </span><span class="cov8" title="1">{
+                dest[n] = e
+        }</span>
+
+        <span class="cov8" title="1">return dest</span>
+}
+
+func (s nodeSet) clone() nodeSet <span class="cov8" title="1">{
+        dest := nodeSet{}
+        for k, v := range s </span><span class="cov8" title="1">{
+                dest[k] = v
+        }</span>
+
+        <span class="cov8" title="1">return dest</span>
+}
+
+func wrapMissingErr(n Node) error <span class="cov0" title="0">{
+        return errors.Wrapf(ErrMissingNode, "node %q", n)
+}</span>
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
