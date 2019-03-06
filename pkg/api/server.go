@@ -7,20 +7,24 @@ import (
 	"path"
 
 	"github.com/georgemac/adagio/pkg/adagio"
-	"github.com/georgemac/adagio/pkg/repository"
 )
 
 const (
 	versionPrefix = "/v0"
 )
 
+type Repository interface {
+	StartRun(adagio.Graph) (*adagio.Run, error)
+	ListRuns() ([]*adagio.Run, error)
+}
+
 type Server struct {
 	*http.ServeMux
 
-	repo repository.Repository
+	repo Repository
 }
 
-func NewServer(repo repository.Repository) *Server {
+func NewServer(repo Repository) *Server {
 	s := &Server{
 		ServeMux: http.NewServeMux(),
 		repo:     repo,

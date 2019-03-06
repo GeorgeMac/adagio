@@ -12,7 +12,7 @@ import (
 
 	"github.com/georgemac/adagio/pkg/adagio"
 	"github.com/georgemac/adagio/pkg/api"
-	"github.com/georgemac/adagio/pkg/repository/memory"
+	"github.com/georgemac/adagio/pkg/memory"
 	"github.com/georgemac/adagio/pkg/worker"
 )
 

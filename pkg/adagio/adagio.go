@@ -2,6 +2,7 @@ package adagio
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/georgemac/adagio/pkg/graph"
@@ -13,7 +14,17 @@ type (
 		Graph Graph  `json:"graph"`
 	}
 
+	Node struct {
+		Name string `json:"-"`
+	}
+
 	NodeState string
+
+	Event struct {
+		Run      *Run
+		Node     *Node
+		From, To NodeState
+	}
 
 	serializedGraph struct {
 		Nodes nodeSet `json:"nodes"`
@@ -24,6 +35,15 @@ type (
 	nodeSet map[string]*Node
 )
 
+var (
+	// ErrRunDoesNotExist is returned when an attempt is made to interface
+	// with a non existent run
+	ErrRunDoesNotExist = errors.New("run does not exist")
+	// ErrNodeNotReady is returned when an attempt is made to claim a node in a waiting
+	// state
+	ErrNodeNotReady = errors.New("node not ready")
+)
+
 const (
 	NoneState    = NodeState("")
 	WaitingState = NodeState("waiting")
@@ -31,10 +51,6 @@ const (
 	RunningState = NodeState("running")
 	DeadState    = NodeState("dead")
 )
-
-type Node struct {
-	Name string `json:"-"`
-}
 
 func (n Node) String() string {
 	return fmt.Sprintf("(%s)", n.Name)

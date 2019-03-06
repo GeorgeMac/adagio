@@ -7,17 +7,17 @@ import (
 	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
-	"github.com/georgemac/adagio/pkg/repository"
+	"github.com/georgemac/adagio/pkg/worker"
 	"github.com/oklog/ulid"
 	"github.com/pkg/errors"
 )
 
-// compile time check to ensure Repository is a repository.Repository
-var _ repository.Repository = (*Repository)(nil)
+// compile time check to ensure Repository is a worker.Repository
+var _ worker.Repository = (*Repository)(nil)
 
 type (
 	nodeSet     map[*adagio.Node]struct{}
-	listenerSet map[adagio.NodeState][]chan<- repository.Event
+	listenerSet map[adagio.NodeState][]chan<- adagio.Event
 )
 
 type Repository struct {
@@ -119,7 +119,7 @@ func (r *Repository) ClaimNode(run *adagio.Run, node *adagio.Node) (bool, error)
 func (r *Repository) notifyListeners(run *adagio.Run, node *adagio.Node, from, to adagio.NodeState) {
 	for _, ch := range r.listeners[to] {
 		select {
-		case ch <- repository.Event{run, node, from, to}:
+		case ch <- adagio.Event{run, node, from, to}:
 			// attempt to send
 		default:
 		}
@@ -162,15 +162,11 @@ func (r *Repository) FinishNode(run *adagio.Run, node *adagio.Node) error {
 	return nil
 }
 
-func (r *Repository) RecoverNode(*adagio.Run, *adagio.Node) (bool, error) {
-	panic("not implemented")
-}
-
 func (r *Repository) BuryNode(*adagio.Run, *adagio.Node) error {
 	panic("not implemented")
 }
 
-func (r *Repository) Subscribe(events chan<- repository.Event, states ...adagio.NodeState) error {
+func (r *Repository) Subscribe(events chan<- adagio.Event, states ...adagio.NodeState) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -183,7 +179,7 @@ func (r *Repository) Subscribe(events chan<- repository.Event, states ...adagio.
 
 func (r *Repository) runMustExist(run *adagio.Run) error {
 	if _, ok := r.runs[run.ID]; !ok {
-		return errors.Wrapf(repository.ErrRunDoesNotExist, "in-memory repository: run %q", run)
+		return errors.Wrapf(adagio.ErrRunDoesNotExist, "in-memory repository: run %q", run)
 	}
 
 	return nil
@@ -191,7 +187,7 @@ func (r *Repository) runMustExist(run *adagio.Run) error {
 
 func (r *Repository) mustNotBeWaiting(node *adagio.Node) error {
 	if _, ok := r.waiting[node]; ok {
-		return errors.Wrapf(repository.ErrNodeNotReady, "in-memory repository: node %q", node)
+		return errors.Wrapf(adagio.ErrNodeNotReady, "in-memory repository: node %q", node)
 	}
 
 	return nil

@@ -6,8 +6,14 @@ import (
 	"sync"
 
 	"github.com/georgemac/adagio/pkg/adagio"
-	"github.com/georgemac/adagio/pkg/repository"
 )
+
+type Repository interface {
+	ClaimNode(*adagio.Run, *adagio.Node) (bool, error)
+	FinishNode(*adagio.Run, *adagio.Node) error
+	BuryNode(*adagio.Run, *adagio.Node) error
+	Subscribe(events chan<- adagio.Event, states ...adagio.NodeState) error
+}
 
 type Handler interface {
 	Run(*adagio.Node) error
@@ -18,13 +24,13 @@ type HandlerFunc func(*adagio.Node) error
 func (fn HandlerFunc) Run(n *adagio.Node) error { return fn(n) }
 
 type Pool struct {
-	repo    repository.Repository
+	repo    Repository
 	handler Handler
 
 	size int
 }
 
-func NewPool(repo repository.Repository, handler Handler) *Pool {
+func NewPool(repo Repository, handler Handler) *Pool {
 	return &Pool{
 		repo:    repo,
 		handler: handler,
@@ -39,7 +45,7 @@ func (p *Pool) Run(ctxt context.Context) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			events := make(chan repository.Event, 10)
+			events := make(chan adagio.Event, 10)
 			p.repo.Subscribe(events, adagio.ReadyState)
 
 			for {
