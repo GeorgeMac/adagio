@@ -25,6 +25,7 @@ message Edge {
 
 message Run {
   string id = 1;
+  string created_at = 2;
 }
 
 message ListRequest {}

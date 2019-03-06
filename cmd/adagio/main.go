@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"text/tabwriter"
 
 	"github.com/georgemac/adagio/pkg/rpc/controlplane"
 )
@@ -58,10 +59,12 @@ func runs() {
 			os.Exit(1)
 		}
 
-		fmt.Println("Runs")
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.AlignRight|tabwriter.Debug)
+		fmt.Fprintln(w, "Runs\tCreated At\t")
 		for _, run := range resp.Runs {
-			fmt.Println(run.Id)
+			fmt.Fprintf(w, "%s\t%s\t\n", run.Id, run.CreatedAt)
 		}
+		w.Flush()
 	default:
 		printRunsUsage()
 		os.Exit(1)

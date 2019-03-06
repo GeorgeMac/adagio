@@ -53,11 +53,12 @@ func (r *Repository) StartRun(graph adagio.Graph) (run *adagio.Run, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	now := time.Now()
+	now := time.Now().UTC()
 
 	run = &adagio.Run{
-		ID:    ulid.MustNew(ulid.Timestamp(now), r.entropy).String(),
-		Graph: graph,
+		ID:        ulid.MustNew(ulid.Timestamp(now), r.entropy).String(),
+		CreatedAt: now,
+		Graph:     graph,
 	}
 
 	r.runs[run.ID] = run

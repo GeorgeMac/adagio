@@ -4,14 +4,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/georgemac/adagio/pkg/graph"
 )
 
 type (
 	Run struct {
-		ID    string `json:"id"`
-		Graph Graph  `json:"graph"`
+		ID        string    `json:"id"`
+		CreatedAt time.Time `json:"created_at"`
+		Graph     Graph     `json:"graph"`
 	}
 
 	Node struct {

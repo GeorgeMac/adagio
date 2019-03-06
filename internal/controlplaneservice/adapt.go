@@ -2,6 +2,7 @@ package controlplaneservice
 
 import (
 	"errors"
+	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
 	"github.com/georgemac/adagio/pkg/graph"
@@ -48,5 +49,5 @@ func toPBRuns(runs ...*adagio.Run) (pbruns []*controlplane.Run) {
 }
 
 func toPBRun(run *adagio.Run) *controlplane.Run {
-	return &controlplane.Run{Id: run.ID}
+	return &controlplane.Run{Id: run.ID, CreatedAt: run.CreatedAt.Format(time.RFC3339)}
 }
