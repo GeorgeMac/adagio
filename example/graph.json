@@ -1,0 +1,21 @@
+{
+  "nodes":[
+    {"name":"a"},
+    {"name":"b"},
+    {"name":"c"},
+    {"name":"d"},
+    {"name":"e"},
+    {"name":"f"},
+    {"name":"g"}
+  ],
+  "edges":[
+    {"source":"a","destination":"c"},
+    {"source":"a","destination":"d"},
+    {"source":"b","destination":"d"},
+    {"source":"b","destination":"f"},
+    {"source":"c","destination":"e"},
+    {"source":"d","destination":"e"},
+    {"source":"e","destination":"g"},
+    {"source":"f","destination":"g"}
+  ]
+}

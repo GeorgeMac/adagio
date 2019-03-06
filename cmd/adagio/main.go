@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 
@@ -48,34 +50,7 @@ func runs() {
 
 	switch os.Args[2] {
 	case "start":
-		graph := &controlplane.Graph{
-			Nodes: []*controlplane.Node{
-				{Name: "a"},
-				{Name: "b"},
-				{Name: "c"},
-				{Name: "d"},
-				{Name: "e"},
-				{Name: "f"},
-				{Name: "g"},
-			},
-			Edges: []*controlplane.Edge{
-				{Source: "a", Destination: "c"},
-				{Source: "a", Destination: "d"},
-				{Source: "b", Destination: "d"},
-				{Source: "b", Destination: "f"},
-				{Source: "c", Destination: "e"},
-				{Source: "d", Destination: "e"},
-				{Source: "e", Destination: "g"},
-				{Source: "f", Destination: "g"},
-			},
-		}
-		run, err := client.Start(context.Background(), graph)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-
-		fmt.Printf("Run started %q\n", run.Id)
+		start(client)
 	case "ls":
 		resp, err := client.List(context.Background(), &controlplane.ListRequest{})
 		if err != nil {
@@ -91,4 +66,44 @@ func runs() {
 		printRunsUsage()
 		os.Exit(1)
 	}
+}
+
+func printStartUsage() {
+	fmt.Println("usage: adagio start [file]")
+	fmt.Println("                    <stdin>")
+}
+
+func start(client controlplane.ControlPlane) {
+	var (
+		graph = &controlplane.Graph{}
+		input io.Reader
+	)
+
+	if len(os.Args) < 4 {
+		input = os.Stdin
+	} else {
+		fi, err := os.Open(os.Args[3])
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		defer fi.Close()
+
+		input = fi
+	}
+
+	if err := json.NewDecoder(input).Decode(graph); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+
+	}
+
+	run, err := client.Start(context.Background(), graph)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Run started %q\n", run.Id)
 }
