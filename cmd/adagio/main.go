@@ -10,13 +10,37 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/georgemac/adagio/internal/controlplaneservice"
 	"github.com/georgemac/adagio/pkg/adagio"
-	"github.com/georgemac/adagio/pkg/api"
 	"github.com/georgemac/adagio/pkg/memory"
+	"github.com/georgemac/adagio/pkg/rpc/controlplane"
 	"github.com/georgemac/adagio/pkg/worker"
 )
 
+func printUsage() {
+	fmt.Println("usage: adagio <command>")
+	fmt.Println("              serve")
+	fmt.Println("              runs")
+}
+
 func main() {
+	if len(os.Args) < 2 {
+		printUsage()
+		os.Exit(1)
+	}
+
+	switch os.Args[1] {
+	case "serve":
+		serve()
+	case "runs":
+		runs()
+	default:
+		printUsage()
+		os.Exit(1)
+	}
+}
+
+func serve() {
 	var (
 		repo    = memory.NewRepository()
 		handler = worker.HandlerFunc(func(node *adagio.Node) error {
@@ -25,20 +49,15 @@ func main() {
 			fmt.Printf("finished with node %s\n", node)
 			return nil
 		})
-		pool   = worker.NewPool(repo, handler)
-		api    = api.NewServer(repo)
-		server = &http.Server{
+		pool    = worker.NewPool(repo, handler)
+		service = controlplaneservice.New(repo)
+		mux     = controlplane.NewControlPlaneServer(service, nil)
+		server  = &http.Server{
 			Addr:    ":7890",
-			Handler: api,
+			Handler: mux,
 		}
 		ctxt, cancel = context.WithCancel(context.Background())
 	)
-
-	if len(os.Args) < 2 || os.Args[1] != "serve" {
-		fmt.Println("usage: adagio <command>")
-		fmt.Println("              serve")
-		os.Exit(1)
-	}
 
 	var (
 		stop     = make(chan os.Signal, 1)
@@ -66,4 +85,66 @@ func main() {
 	}()
 
 	<-finished
+
+}
+
+func printRunsUsage() {
+	fmt.Println("usage: adagio runs <command>")
+	fmt.Println("                   start")
+	fmt.Println("                   ls")
+}
+
+func runs() {
+	if len(os.Args) < 3 {
+		printRunsUsage()
+		os.Exit(1)
+	}
+
+	client := controlplane.NewControlPlaneProtobufClient("http://localhost:7890", &http.Client{})
+
+	switch os.Args[2] {
+	case "start":
+		graph := &controlplane.Graph{
+			Nodes: []*controlplane.Node{
+				{Name: "a"},
+				{Name: "b"},
+				{Name: "c"},
+				{Name: "d"},
+				{Name: "e"},
+				{Name: "f"},
+				{Name: "g"},
+			},
+			Edges: []*controlplane.Edge{
+				{Source: "a", Destination: "c"},
+				{Source: "a", Destination: "d"},
+				{Source: "b", Destination: "d"},
+				{Source: "b", Destination: "f"},
+				{Source: "c", Destination: "e"},
+				{Source: "d", Destination: "e"},
+				{Source: "e", Destination: "g"},
+				{Source: "f", Destination: "g"},
+			},
+		}
+		run, err := client.Start(context.Background(), graph)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("Run started %q\n", run.Id)
+	case "ls":
+		resp, err := client.List(context.Background(), &controlplane.ListRequest{})
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		fmt.Println("Runs")
+		for _, run := range resp.Runs {
+			fmt.Println(run.Id)
+		}
+	default:
+		printRunsUsage()
+		os.Exit(1)
+	}
 }

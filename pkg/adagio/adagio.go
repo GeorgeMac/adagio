@@ -60,6 +60,10 @@ type Graph struct {
 	graph *graph.Graph
 }
 
+func NewGraph(graph *graph.Graph) Graph {
+	return Graph{graph}
+}
+
 func (g *Graph) IsRoot(n *Node) (bool, error) {
 	return g.graph.IsRoot(n)
 }

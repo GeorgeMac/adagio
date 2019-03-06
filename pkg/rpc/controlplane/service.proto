@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package tempo.adagio.controlplane;
+
+option go_package = "controlplane";
+
+service ControlPlane {
+  rpc Start(Graph) returns (Run);
+  rpc List(ListRequest) returns (ListResponse);
+}
+
+message Graph {
+  repeated Node nodes = 1;
+  repeated Edge edges = 2;
+}
+
+message Node {
+  string name = 1;
+}
+
+message Edge {
+  string source = 1;
+  string destination = 2;
+}
+
+message Run {
+  string id = 1;
+}
+
+message ListRequest {}
+
+message ListResponse {
+  repeated Run runs = 1;
+}
