@@ -60,7 +60,7 @@ func runs() {
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.AlignRight|tabwriter.Debug)
-		fmt.Fprintln(w, "Runs\tCreated At\t")
+		fmt.Fprintln(w, "ID\tCreated At\t")
 		for _, run := range resp.Runs {
 			fmt.Fprintf(w, "%s\t%s\t\n", run.Id, run.CreatedAt)
 		}
