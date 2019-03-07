@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/georgemac/adagio/pkg/adagio"
 	"github.com/georgemac/adagio/pkg/graph"
 	"github.com/georgemac/adagio/pkg/worker"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -36,7 +38,7 @@ func init() {
 	ExampleGraph.Connect(nodeA, nodeD)
 	ExampleGraph.Connect(nodeB, nodeD)
 	ExampleGraph.Connect(nodeB, nodeF)
-	ExampleGraph.Connect(nodeC, nodeD)
+	ExampleGraph.Connect(nodeC, nodeE)
 	ExampleGraph.Connect(nodeD, nodeE)
 	ExampleGraph.Connect(nodeE, nodeG)
 	ExampleGraph.Connect(nodeF, nodeG)
@@ -89,12 +91,152 @@ func TestHarness(t *testing.T, repo Repository) {
 			assert.Equal(t, run.ID, runs[0].ID)
 		})
 
-		t.Run("5 claims are successfully attempted for node a", func(t *testing.T) {
-			claimed := attemptNClaims(t, repo, run, nodeA, 5)
+		t.Run("waiting nodes", func(t *testing.T) {
+			for _, node := range []*adagio.Node{nodeC, nodeD, nodeE, nodeF, nodeG} {
+				t.Run(fmt.Sprintf("node %q cannot be claimed because it is not ready", node), func(t *testing.T) {
+					// assigned node locally
+					node := node
 
-			t.Run("only 1 succeeds", func(t *testing.T) {
-				assert.Equal(t, int32(1), claimed)
-			})
+					t.Parallel()
+
+					_, err := repo.ClaimNode(run, node)
+					assert.Equal(t, adagio.ErrNodeNotReady, errors.Cause(err))
+				})
+			}
+		})
+
+		t.Run("ready nodes", func(t *testing.T) {
+			for _, node := range []*adagio.Node{nodeA, nodeB} {
+				t.Run(fmt.Sprintf("5 claims are successfully attempted for node %q", node), func(t *testing.T) {
+					// assigned node locally
+					node := node
+
+					t.Parallel()
+
+					claimed := attemptNClaims(t, repo, run, node, 5)
+
+					t.Run("only 1 succeeds", func(t *testing.T) {
+						assert.Equal(t, int32(1), claimed)
+					})
+				})
+			}
+		})
+
+		t.Run("finish", func(t *testing.T) {
+			for _, node := range []*adagio.Node{nodeA, nodeB} {
+				t.Run(fmt.Sprintf("node %q", node), func(t *testing.T) {
+					// assigned node locally
+					node := node
+
+					t.Parallel()
+
+					assert.Nil(t, repo.FinishNode(run, node))
+				})
+			}
+		})
+
+		t.Run("remaining waiting nodes", func(t *testing.T) {
+			for _, node := range []*adagio.Node{nodeE, nodeG} {
+				t.Run(fmt.Sprintf("node %q cannot be claimed because it is not ready", node), func(t *testing.T) {
+					// assigned node locally
+					node := node
+
+					t.Parallel()
+
+					_, err := repo.ClaimNode(run, node)
+					assert.Equal(t, adagio.ErrNodeNotReady, errors.Cause(err))
+				})
+			}
+		})
+
+		t.Run("new ready nodes", func(t *testing.T) {
+			for _, node := range []*adagio.Node{nodeC, nodeD, nodeF} {
+				t.Run(fmt.Sprintf("5 claims are successfully attempted for node %q", node), func(t *testing.T) {
+					// assigned node locally
+					node := node
+
+					t.Parallel()
+
+					claimed := attemptNClaims(t, repo, run, node, 5)
+
+					t.Run("only 1 succeeds", func(t *testing.T) {
+						assert.Equal(t, int32(1), claimed)
+					})
+				})
+			}
+		})
+
+		t.Run("finish", func(t *testing.T) {
+			for _, node := range []*adagio.Node{nodeC, nodeD, nodeF} {
+				t.Run(fmt.Sprintf("node %q", node), func(t *testing.T) {
+					// assigned node locally
+					node := node
+
+					t.Parallel()
+
+					assert.Nil(t, repo.FinishNode(run, node))
+				})
+			}
+		})
+
+		t.Run("new ready nodes", func(t *testing.T) {
+			for _, node := range []*adagio.Node{nodeE} {
+				t.Run(fmt.Sprintf("5 claims are successfully attempted for node %q", node), func(t *testing.T) {
+					// assigned node locally
+					node := node
+
+					t.Parallel()
+
+					claimed := attemptNClaims(t, repo, run, node, 5)
+
+					t.Run("only 1 succeeds", func(t *testing.T) {
+						assert.Equal(t, int32(1), claimed)
+					})
+				})
+			}
+		})
+
+		t.Run("finish", func(t *testing.T) {
+			for _, node := range []*adagio.Node{nodeE} {
+				t.Run(fmt.Sprintf("node %q", node), func(t *testing.T) {
+					// assigned node locally
+					node := node
+
+					t.Parallel()
+
+					assert.Nil(t, repo.FinishNode(run, node))
+				})
+			}
+		})
+
+		t.Run("new ready nodes", func(t *testing.T) {
+			for _, node := range []*adagio.Node{nodeG} {
+				t.Run(fmt.Sprintf("5 claims are successfully attempted for node %q", node), func(t *testing.T) {
+					// assigned node locally
+					node := node
+
+					t.Parallel()
+
+					claimed := attemptNClaims(t, repo, run, node, 5)
+
+					t.Run("only 1 succeeds", func(t *testing.T) {
+						assert.Equal(t, int32(1), claimed)
+					})
+				})
+			}
+		})
+
+		t.Run("finish", func(t *testing.T) {
+			for _, node := range []*adagio.Node{nodeG} {
+				t.Run(fmt.Sprintf("node %q", node), func(t *testing.T) {
+					// assigned node locally
+					node := node
+
+					t.Parallel()
+
+					assert.Nil(t, repo.FinishNode(run, node))
+				})
+			}
 		})
 	})
 }
