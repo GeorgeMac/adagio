@@ -122,18 +122,7 @@ func TestHarness(t *testing.T, repo Repository) {
 			}
 		})
 
-		t.Run("finish", func(t *testing.T) {
-			for _, node := range []*adagio.Node{nodeA, nodeB} {
-				t.Run(fmt.Sprintf("node %q", node), func(t *testing.T) {
-					// assigned node locally
-					node := node
-
-					t.Parallel()
-
-					assert.Nil(t, repo.FinishNode(run, node))
-				})
-			}
-		})
+		canFinish(t, repo, run, nodeA, nodeB)
 
 		t.Run("remaining waiting nodes", func(t *testing.T) {
 			for _, node := range []*adagio.Node{nodeE, nodeG} {
@@ -166,18 +155,7 @@ func TestHarness(t *testing.T, repo Repository) {
 			}
 		})
 
-		t.Run("finish", func(t *testing.T) {
-			for _, node := range []*adagio.Node{nodeC, nodeD, nodeF} {
-				t.Run(fmt.Sprintf("node %q", node), func(t *testing.T) {
-					// assigned node locally
-					node := node
-
-					t.Parallel()
-
-					assert.Nil(t, repo.FinishNode(run, node))
-				})
-			}
-		})
+		canFinish(t, repo, run, nodeC, nodeD, nodeF)
 
 		t.Run("new ready nodes", func(t *testing.T) {
 			for _, node := range []*adagio.Node{nodeE} {
@@ -196,18 +174,7 @@ func TestHarness(t *testing.T, repo Repository) {
 			}
 		})
 
-		t.Run("finish", func(t *testing.T) {
-			for _, node := range []*adagio.Node{nodeE} {
-				t.Run(fmt.Sprintf("node %q", node), func(t *testing.T) {
-					// assigned node locally
-					node := node
-
-					t.Parallel()
-
-					assert.Nil(t, repo.FinishNode(run, node))
-				})
-			}
-		})
+		canFinish(t, repo, run, nodeE)
 
 		t.Run("new ready nodes", func(t *testing.T) {
 			for _, node := range []*adagio.Node{nodeG} {
@@ -226,18 +193,24 @@ func TestHarness(t *testing.T, repo Repository) {
 			}
 		})
 
-		t.Run("finish", func(t *testing.T) {
-			for _, node := range []*adagio.Node{nodeG} {
-				t.Run(fmt.Sprintf("node %q", node), func(t *testing.T) {
-					// assigned node locally
-					node := node
+		canFinish(t, repo, run, nodeG)
+	})
+}
 
-					t.Parallel()
+func canFinish(t *testing.T, repo Repository, run *adagio.Run, nodes ...*adagio.Node) {
+	t.Helper()
 
-					assert.Nil(t, repo.FinishNode(run, node))
-				})
-			}
-		})
+	t.Run("can finish", func(t *testing.T) {
+		for _, node := range nodes {
+			t.Run(fmt.Sprintf("node %q", node), func(t *testing.T) {
+				// assigned node locally
+				node := node
+
+				t.Parallel()
+
+				assert.Nil(t, repo.FinishNode(run, node))
+			})
+		}
 	})
 }
 
