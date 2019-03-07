@@ -91,109 +91,90 @@ func TestHarness(t *testing.T, repo Repository) {
 			assert.Equal(t, run.ID, runs[0].ID)
 		})
 
-		t.Run("waiting nodes", func(t *testing.T) {
-			for _, node := range []*adagio.Node{nodeC, nodeD, nodeE, nodeF, nodeG} {
-				t.Run(fmt.Sprintf("node %q cannot be claimed because it is not ready", node), func(t *testing.T) {
-					// assigned node locally
-					node := node
+		// (›) ---> (c)----
+		//   \             \
+		//    ------v       v
+		//         (d) --> (e) --> (g)
+		//    ------^               ^
+		//   /                     /
+		// (›) --> (f) ------------
+		canNotClaim(t, repo, run, nodeC, nodeD, nodeE, nodeF, nodeG)
 
-					t.Parallel()
-
-					_, err := repo.ClaimNode(run, node)
-					assert.Equal(t, adagio.ErrNodeNotReady, errors.Cause(err))
-				})
-			}
-		})
-
-		t.Run("ready nodes", func(t *testing.T) {
-			for _, node := range []*adagio.Node{nodeA, nodeB} {
-				t.Run(fmt.Sprintf("5 claims are successfully attempted for node %q", node), func(t *testing.T) {
-					// assigned node locally
-					node := node
-
-					t.Parallel()
-
-					claimed := attemptNClaims(t, repo, run, node, 5)
-
-					t.Run("only 1 succeeds", func(t *testing.T) {
-						assert.Equal(t, int32(1), claimed)
-					})
-				})
-			}
-		})
+		canClaim(t, repo, run, nodeA, nodeB)
 
 		canFinish(t, repo, run, nodeA, nodeB)
 
-		t.Run("remaining waiting nodes", func(t *testing.T) {
-			for _, node := range []*adagio.Node{nodeE, nodeG} {
-				t.Run(fmt.Sprintf("node %q cannot be claimed because it is not ready", node), func(t *testing.T) {
-					// assigned node locally
-					node := node
+		// (✓) ---> (›)----
+		//   \             \
+		//    ------v       v
+		//         (›) --> (e) --> (g)
+		//    ------^               ^
+		//   /                     /
+		// (✓) --> (›) ------------
+		canNotClaim(t, repo, run, nodeE, nodeG)
 
-					t.Parallel()
-
-					_, err := repo.ClaimNode(run, node)
-					assert.Equal(t, adagio.ErrNodeNotReady, errors.Cause(err))
-				})
-			}
-		})
-
-		t.Run("new ready nodes", func(t *testing.T) {
-			for _, node := range []*adagio.Node{nodeC, nodeD, nodeF} {
-				t.Run(fmt.Sprintf("5 claims are successfully attempted for node %q", node), func(t *testing.T) {
-					// assigned node locally
-					node := node
-
-					t.Parallel()
-
-					claimed := attemptNClaims(t, repo, run, node, 5)
-
-					t.Run("only 1 succeeds", func(t *testing.T) {
-						assert.Equal(t, int32(1), claimed)
-					})
-				})
-			}
-		})
+		canClaim(t, repo, run, nodeC, nodeD, nodeF)
 
 		canFinish(t, repo, run, nodeC, nodeD, nodeF)
 
-		t.Run("new ready nodes", func(t *testing.T) {
-			for _, node := range []*adagio.Node{nodeE} {
-				t.Run(fmt.Sprintf("5 claims are successfully attempted for node %q", node), func(t *testing.T) {
-					// assigned node locally
-					node := node
+		// (✓) ---> (✓)----
+		//   \             \
+		//    ------v       v
+		//         (✓) --> (›) --> (g)
+		//    ------^               ^
+		//   /                     /
+		// (✓) --> (✓) ------------
+		canNotClaim(t, repo, run, nodeG)
 
-					t.Parallel()
-
-					claimed := attemptNClaims(t, repo, run, node, 5)
-
-					t.Run("only 1 succeeds", func(t *testing.T) {
-						assert.Equal(t, int32(1), claimed)
-					})
-				})
-			}
-		})
+		canClaim(t, repo, run, nodeE)
 
 		canFinish(t, repo, run, nodeE)
 
-		t.Run("new ready nodes", func(t *testing.T) {
-			for _, node := range []*adagio.Node{nodeG} {
-				t.Run(fmt.Sprintf("5 claims are successfully attempted for node %q", node), func(t *testing.T) {
-					// assigned node locally
-					node := node
-
-					t.Parallel()
-
-					claimed := attemptNClaims(t, repo, run, node, 5)
-
-					t.Run("only 1 succeeds", func(t *testing.T) {
-						assert.Equal(t, int32(1), claimed)
-					})
-				})
-			}
-		})
+		// (✓) ---> (✓)----
+		//   \             \
+		//    ------v       v
+		//         (✓) --> (✓) --> (›)
+		//    ------^               ^
+		//   /                     /
+		// (✓) --> (✓) ------------
+		canClaim(t, repo, run, nodeG)
 
 		canFinish(t, repo, run, nodeG)
+	})
+}
+
+func canNotClaim(t *testing.T, repo Repository, run *adagio.Run, nodes ...*adagio.Node) {
+	t.Run("can not claim", func(t *testing.T) {
+		for _, node := range nodes {
+			t.Run(fmt.Sprintf("node %q cannot be claimed because it is not ready", node), func(t *testing.T) {
+				// assigned node locally
+				node := node
+
+				t.Parallel()
+
+				_, err := repo.ClaimNode(run, node)
+				assert.Equal(t, adagio.ErrNodeNotReady, errors.Cause(err))
+			})
+		}
+	})
+}
+
+func canClaim(t *testing.T, repo Repository, run *adagio.Run, nodes ...*adagio.Node) {
+	t.Run("can claim", func(t *testing.T) {
+		for _, node := range nodes {
+			t.Run(fmt.Sprintf("5 concurrent claim attempts for node %q", node), func(t *testing.T) {
+				// assigned node locally
+				node := node
+
+				t.Parallel()
+
+				claimed := attemptNClaims(t, repo, run, node, 5)
+
+				t.Run("only 1 succeeds", func(t *testing.T) {
+					assert.Equal(t, int32(1), claimed)
+				})
+			})
+		}
 	})
 }
 
