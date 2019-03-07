@@ -47,11 +47,12 @@ var (
 )
 
 const (
-	NoneState    = NodeState("")
-	WaitingState = NodeState("waiting")
-	ReadyState   = NodeState("ready")
-	RunningState = NodeState("running")
-	DeadState    = NodeState("dead")
+	NoneState      = NodeState("")
+	WaitingState   = NodeState("waiting")
+	ReadyState     = NodeState("ready")
+	RunningState   = NodeState("running")
+	CompletedState = NodeState("completed")
+	DeadState      = NodeState("dead")
 )
 
 func (n Node) String() string {

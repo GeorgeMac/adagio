@@ -36,7 +36,7 @@ type Repository struct {
 	mu sync.Mutex
 }
 
-func NewRepository() *Repository {
+func New() *Repository {
 	return &Repository{
 		runs:      map[string]*adagio.Run{},
 		waiting:   map[*adagio.Node]nodeSet{},
@@ -160,6 +160,8 @@ func (r *Repository) FinishNode(run *adagio.Run, node *adagio.Node) error {
 
 	r.done[node] = struct{}{}
 
+	r.notifyListeners(run, node, adagio.RunningState, adagio.CompletedState)
+
 	return nil
 }
 
@@ -173,6 +175,22 @@ func (r *Repository) Subscribe(events chan<- adagio.Event, states ...adagio.Node
 
 	for _, state := range states {
 		r.listeners[state] = append(r.listeners[state], events)
+	}
+
+	return nil
+}
+
+func (r *Repository) UnsubscribeAll(events chan<- adagio.Event) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for event, chans := range r.listeners {
+		for i, ch := range chans {
+			if ch == events {
+				// remove channel from listening map
+				r.listeners[event] = append(chans[0:i], chans[i+1:]...)
+			}
+		}
 	}
 
 	return nil
