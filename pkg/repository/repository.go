@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -57,27 +58,6 @@ type UnsubscribeRepository interface {
 func TestHarness(t *testing.T, repo Repository) {
 	t.Helper()
 
-	var (
-		events    = make(chan adagio.Event, 10)
-		collected = make([]adagio.Event, 0)
-		err       = repo.Subscribe(events, adagio.ReadyState, adagio.RunningState, adagio.CompletedState)
-	)
-	require.Nil(t, err)
-
-	go func() {
-		defer func() {
-			if urepo, ok := repo.(UnsubscribeRepository); ok {
-				urepo.UnsubscribeAll(events)
-			}
-
-			close(events)
-		}()
-
-		for event := range events {
-			collected = append(collected, event)
-		}
-	}()
-
 	t.Run("a run is created", func(t *testing.T) {
 		run, err := repo.StartRun(adagio.NewGraph(ExampleGraph))
 		require.Nil(t, err)
@@ -91,64 +71,109 @@ func TestHarness(t *testing.T, repo Repository) {
 			assert.Equal(t, run.ID, runs[0].ID)
 		})
 
-		t.Run("input layer", func(t *testing.T) {
-			// (›) ---> (c)----
-			//   \             \
-			//    ------v       v
-			//         (d) --> (e) --> (g)
-			//    ------^               ^
-			//   /                     /
-			// (›) --> (f) ------------
-			canNotClaim(t, repo, run, nodeC, nodeD, nodeE, nodeF, nodeG)
+		// (›) ---> (c)----
+		//   \             \
+		//    ------v       v
+		//         (d) --> (e) --> (g)
+		//    ------^               ^
+		//   /                     /
+		// (›) --> (f) ------------
+		testLayer(t, "input layer", repo, run, []*adagio.Node{nodeC, nodeD, nodeE, nodeF, nodeG}, []*adagio.Node{nodeA, nodeB}, []adagio.Event{
+			{Node: nodeA, From: adagio.ReadyState, To: adagio.RunningState},
+			{Node: nodeA, From: adagio.RunningState, To: adagio.CompletedState},
+			{Node: nodeB, From: adagio.ReadyState, To: adagio.RunningState},
+			{Node: nodeB, From: adagio.RunningState, To: adagio.CompletedState},
+			{Node: nodeC, From: adagio.WaitingState, To: adagio.ReadyState},
+			{Node: nodeD, From: adagio.WaitingState, To: adagio.ReadyState},
+			{Node: nodeF, From: adagio.WaitingState, To: adagio.ReadyState},
+		}...)
 
-			canClaim(t, repo, run, nodeA, nodeB)
-		})
+		// (✓) ---> (›)----
+		//   \             \
+		//    ------v       v
+		//         (›) --> (e) --> (g)
+		//    ------^               ^
+		//   /                     /
+		// (✓) --> (›) ------------
+		testLayer(t, "layer two", repo, run, []*adagio.Node{nodeE, nodeG}, []*adagio.Node{nodeC, nodeD, nodeF}, []adagio.Event{
+			{Node: nodeC, From: adagio.ReadyState, To: adagio.RunningState},
+			{Node: nodeC, From: adagio.RunningState, To: adagio.CompletedState},
+			{Node: nodeD, From: adagio.ReadyState, To: adagio.RunningState},
+			{Node: nodeD, From: adagio.RunningState, To: adagio.CompletedState},
+			{Node: nodeE, From: adagio.WaitingState, To: adagio.ReadyState},
+			{Node: nodeF, From: adagio.ReadyState, To: adagio.RunningState},
+			{Node: nodeF, From: adagio.RunningState, To: adagio.CompletedState},
+		}...)
 
-		canFinish(t, repo, run, nodeA, nodeB)
+		// (✓) ---> (✓)----
+		//   \             \
+		//    ------v       v
+		//         (✓) --> (›) --> (g)
+		//    ------^               ^
+		//   /                     /
+		// (✓) --> (✓) ------------
+		testLayer(t, "layer three", repo, run, []*adagio.Node{nodeG}, []*adagio.Node{nodeE}, []adagio.Event{
+			{Node: nodeE, From: adagio.ReadyState, To: adagio.RunningState},
+			{Node: nodeE, From: adagio.RunningState, To: adagio.CompletedState},
+			{Node: nodeG, From: adagio.WaitingState, To: adagio.ReadyState},
+		}...)
 
-		t.Run("layer two", func(t *testing.T) {
-			// (✓) ---> (›)----
-			//   \             \
-			//    ------v       v
-			//         (›) --> (e) --> (g)
-			//    ------^               ^
-			//   /                     /
-			// (✓) --> (›) ------------
-			canNotClaim(t, repo, run, nodeE, nodeG)
-
-			canClaim(t, repo, run, nodeC, nodeD, nodeF)
-		})
-
-		canFinish(t, repo, run, nodeC, nodeD, nodeF)
-
-		t.Run("layer three", func(t *testing.T) {
-			// (✓) ---> (✓)----
-			//   \             \
-			//    ------v       v
-			//         (✓) --> (›) --> (g)
-			//    ------^               ^
-			//   /                     /
-			// (✓) --> (✓) ------------
-			canNotClaim(t, repo, run, nodeG)
-
-			canClaim(t, repo, run, nodeE)
-		})
-
-		canFinish(t, repo, run, nodeE)
-
-		t.Run("final three", func(t *testing.T) {
-			// (✓) ---> (✓)----
-			//   \             \
-			//    ------v       v
-			//         (✓) --> (✓) --> (›)
-			//    ------^               ^
-			//   /                     /
-			// (✓) --> (✓) ------------
-			canClaim(t, repo, run, nodeG)
-		})
-
-		canFinish(t, repo, run, nodeG)
+		// (✓) ---> (✓)----
+		//   \             \
+		//    ------v       v
+		//         (✓) --> (✓) --> (›)
+		//    ------^               ^
+		//   /                     /
+		// (✓) --> (✓) ------------
+		testLayer(t, "final layer", repo, run, nil, []*adagio.Node{nodeG}, []adagio.Event{
+			{Node: nodeG, From: adagio.ReadyState, To: adagio.RunningState},
+			{Node: nodeG, From: adagio.RunningState, To: adagio.CompletedState},
+		}...)
 	})
+}
+
+func testLayer(t *testing.T, name string, repo Repository, run *adagio.Run, notClaimed, claimed []*adagio.Node, expectedEvents ...adagio.Event) {
+	t.Helper()
+
+	var (
+		events    = make(chan adagio.Event, len(expectedEvents))
+		collected = make([]adagio.Event, 0)
+		err       = repo.Subscribe(events, adagio.ReadyState, adagio.RunningState, adagio.CompletedState)
+	)
+	require.Nil(t, err)
+
+	defer func() {
+		if urepo, ok := repo.(UnsubscribeRepository); ok {
+			urepo.UnsubscribeAll(events)
+		}
+
+		close(events)
+	}()
+
+	t.Run(name, func(t *testing.T) {
+		canNotClaim(t, repo, run, notClaimed...)
+
+		canClaim(t, repo, run, claimed...)
+	})
+
+	canFinish(t, repo, run, claimed...)
+
+	for i := 0; i < len(expectedEvents); i++ {
+		select {
+		case event := <-events:
+			event.Run = nil
+			collected = append(collected, event)
+		default:
+		}
+	}
+
+	sort.SliceStable(collected, func(i, j int) bool {
+		return collected[i].Node.Name < collected[j].Node.Name
+	})
+
+	if expectedEvents != nil {
+		assert.Equal(t, expectedEvents, collected)
+	}
 }
 
 func canNotClaim(t *testing.T, repo Repository, run *adagio.Run, nodes ...*adagio.Node) {
