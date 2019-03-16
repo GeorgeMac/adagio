@@ -19,7 +19,7 @@ import (
 
 func main() {
 	var (
-		repo    = memory.NewRepository()
+		repo    = memory.New()
 		handler = worker.HandlerFunc(func(node *adagio.Node) error {
 			fmt.Printf("got node %s\n", node)
 			time.Sleep(5 * time.Second)
