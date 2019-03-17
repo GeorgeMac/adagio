@@ -11,29 +11,28 @@ import (
 type Repository interface {
 	ClaimNode(*adagio.Run, *adagio.Node) (bool, error)
 	FinishNode(*adagio.Run, *adagio.Node) error
-	BuryNode(*adagio.Run, *adagio.Node) error
 	Subscribe(events chan<- adagio.Event, states ...adagio.NodeState) error
 }
 
-type Handler interface {
+type Runtime interface {
 	Run(*adagio.Node) error
 }
 
-type HandlerFunc func(*adagio.Node) error
+type RuntimeFunc func(*adagio.Node) error
 
-func (fn HandlerFunc) Run(n *adagio.Node) error { return fn(n) }
+func (fn RuntimeFunc) Run(n *adagio.Node) error { return fn(n) }
 
 type Pool struct {
 	repo    Repository
-	handler Handler
+	runtime Runtime
 
 	size int
 }
 
-func NewPool(repo Repository, handler Handler) *Pool {
+func NewPool(repo Repository, runtime Runtime) *Pool {
 	return &Pool{
 		repo:    repo,
-		handler: handler,
+		runtime: runtime,
 		size:    5,
 	}
 }
@@ -43,6 +42,7 @@ func (p *Pool) Run(ctxt context.Context) {
 
 	for i := 0; i < p.size; i++ {
 		wg.Add(1)
+
 		go func() {
 			defer wg.Done()
 			events := make(chan adagio.Event, 10)
@@ -61,7 +61,7 @@ func (p *Pool) Run(ctxt context.Context) {
 						continue
 					}
 
-					if err := p.handler.Run(event.Node); err != nil {
+					if err := p.runtime.Run(event.Node); err != nil {
 						log.Println(err)
 						// TODO implement retry behavior
 						continue
@@ -70,8 +70,6 @@ func (p *Pool) Run(ctxt context.Context) {
 					if err := p.repo.FinishNode(event.Run, event.Node); err != nil {
 						log.Println(err)
 					}
-
-					log.Println("finished", event.Node)
 				case <-ctxt.Done():
 					return
 				}
