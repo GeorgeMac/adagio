@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package tempo.adagio.controlplane;
+package adagio.rpc.controlplane;
 
 option go_package = "controlplane";
 
