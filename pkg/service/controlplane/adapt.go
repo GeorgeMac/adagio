@@ -16,7 +16,10 @@ func toAdagioGraph(input *controlplane.Graph) (adagio.Graph, error) {
 	)
 
 	for _, n := range input.Nodes {
-		node := &adagio.Node{Name: n.Name}
+		node := &adagio.Node{
+			Name:    n.Name,
+			Runtime: n.Runtime,
+		}
 		nodes = append(nodes, node)
 		nameToNode[node.Name] = node
 	}

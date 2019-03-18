@@ -1,12 +1,33 @@
 {
   "nodes":[
-    {"name":"a"},
-    {"name":"b"},
-    {"name":"c"},
-    {"name":"d"},
-    {"name":"e"},
-    {"name":"f"},
-    {"name":"g"}
+    {
+      "name":    "a",
+      "runtime": "echo"
+    },
+    {
+      "name":    "b",
+      "runtime": "echo"
+    },
+    {
+      "name":    "c",
+      "runtime": "echo"
+    },
+    {
+      "name":    "d",
+      "runtime": "echo"
+    },
+    {
+      "name":    "e",
+      "runtime": "echo"
+    },
+    {
+      "name":    "f",
+      "runtime": "echo"
+    },
+    {
+      "name":    "g",
+      "runtime": "echo"
+    }
   ],
   "edges":[
     {"source":"a","destination":"c"},

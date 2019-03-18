@@ -9,7 +9,6 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
 	"github.com/georgemac/adagio/pkg/memory"
@@ -88,10 +87,14 @@ func api(ctxt context.Context, repo controlservice.Repository) {
 }
 
 func agent(ctxt context.Context, repo worker.Repository) {
-	worker.NewPool(repo, worker.RuntimeFunc(func(node *adagio.Node) error {
-		fmt.Printf("got node %s\n", node)
-		time.Sleep(5 * time.Second)
-		fmt.Printf("finished with node %s\n", node)
-		return nil
-	})).Run(ctxt)
+	var (
+		runtimes = map[string]worker.Runtime{
+			"echo": worker.RuntimeFunc(func(node *adagio.Node) error {
+				fmt.Printf("got node %s\n", node)
+				return nil
+			}),
+		}
+	)
+
+	worker.NewPool(repo, runtimes).Run(ctxt)
 }

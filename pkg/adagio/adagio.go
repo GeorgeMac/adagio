@@ -17,7 +17,8 @@ type (
 	}
 
 	Node struct {
-		Name string `json:"-"`
+		Name    string `json:"-"`
+		Runtime string `json:"runtime"`
 	}
 
 	NodeState string

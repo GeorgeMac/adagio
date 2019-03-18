@@ -16,6 +16,7 @@ message Graph {
 
 message Node {
   string name = 1;
+  string runtime = 2;
 }
 
 message Edge {
