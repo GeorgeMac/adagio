@@ -71,94 +71,131 @@ func TestHarness(t *testing.T, repo Repository) {
 			assert.Equal(t, run.ID, runs[0].ID)
 		})
 
-		// (›) ---> (c)----
-		//   \             \
-		//    ------v       v
-		//         (d) --> (e) --> (g)
-		//    ------^               ^
-		//   /                     /
-		// (›) --> (f) ------------
-		testLayer(t, "input layer", repo, run, []*adagio.Node{nodeC, nodeD, nodeE, nodeF, nodeG}, []*adagio.Node{nodeA, nodeB}, []adagio.Event{
-			{Node: nodeA, From: adagio.ReadyState, To: adagio.RunningState},
-			{Node: nodeA, From: adagio.RunningState, To: adagio.CompletedState},
-			{Node: nodeB, From: adagio.ReadyState, To: adagio.RunningState},
-			{Node: nodeB, From: adagio.RunningState, To: adagio.CompletedState},
-			{Node: nodeC, From: adagio.WaitingState, To: adagio.ReadyState},
-			{Node: nodeD, From: adagio.WaitingState, To: adagio.ReadyState},
-			{Node: nodeF, From: adagio.WaitingState, To: adagio.ReadyState},
-		}...)
-
-		// (✓) ---> (›)----
-		//   \             \
-		//    ------v       v
-		//         (›) --> (e) --> (g)
-		//    ------^               ^
-		//   /                     /
-		// (✓) --> (›) ------------
-		testLayer(t, "layer two", repo, run, []*adagio.Node{nodeE, nodeG}, []*adagio.Node{nodeC, nodeD, nodeF}, []adagio.Event{
-			{Node: nodeC, From: adagio.ReadyState, To: adagio.RunningState},
-			{Node: nodeC, From: adagio.RunningState, To: adagio.CompletedState},
-			{Node: nodeD, From: adagio.ReadyState, To: adagio.RunningState},
-			{Node: nodeD, From: adagio.RunningState, To: adagio.CompletedState},
-			{Node: nodeE, From: adagio.WaitingState, To: adagio.ReadyState},
-			{Node: nodeF, From: adagio.ReadyState, To: adagio.RunningState},
-			{Node: nodeF, From: adagio.RunningState, To: adagio.CompletedState},
-		}...)
-
-		// (✓) ---> (✓)----
-		//   \             \
-		//    ------v       v
-		//         (✓) --> (›) --> (g)
-		//    ------^               ^
-		//   /                     /
-		// (✓) --> (✓) ------------
-		testLayer(t, "layer three", repo, run, []*adagio.Node{nodeG}, []*adagio.Node{nodeE}, []adagio.Event{
-			{Node: nodeE, From: adagio.ReadyState, To: adagio.RunningState},
-			{Node: nodeE, From: adagio.RunningState, To: adagio.CompletedState},
-			{Node: nodeG, From: adagio.WaitingState, To: adagio.ReadyState},
-		}...)
-
-		// (✓) ---> (✓)----
-		//   \             \
-		//    ------v       v
-		//         (✓) --> (✓) --> (›)
-		//    ------^               ^
-		//   /                     /
-		// (✓) --> (✓) ------------
-		testLayer(t, "final layer", repo, run, nil, []*adagio.Node{nodeG}, []adagio.Event{
-			{Node: nodeG, From: adagio.ReadyState, To: adagio.RunningState},
-			{Node: nodeG, From: adagio.RunningState, To: adagio.CompletedState},
-		}...)
+		for _, layer := range []TestLayer{
+			{
+				// (›) ---> (c)----
+				//   \             \
+				//    ------v       v
+				//         (d) --> (e) --> (g)
+				//    ------^               ^
+				//   /                     /
+				// (›) --> (f) ------------
+				Name:        "input layer",
+				Repository:  repo,
+				Run:         run,
+				Unclaimable: []*adagio.Node{nodeC, nodeD, nodeE, nodeF, nodeG},
+				Claimable:   []*adagio.Node{nodeA, nodeB},
+				Events: []adagio.Event{
+					{Node: nodeA, From: adagio.ReadyState, To: adagio.RunningState},
+					{Node: nodeA, From: adagio.RunningState, To: adagio.CompletedState},
+					{Node: nodeB, From: adagio.ReadyState, To: adagio.RunningState},
+					{Node: nodeB, From: adagio.RunningState, To: adagio.CompletedState},
+					{Node: nodeC, From: adagio.WaitingState, To: adagio.ReadyState},
+					{Node: nodeD, From: adagio.WaitingState, To: adagio.ReadyState},
+					{Node: nodeF, From: adagio.WaitingState, To: adagio.ReadyState},
+				},
+			},
+			{
+				// (✓) ---> (›)----
+				//   \             \
+				//    ------v       v
+				//         (›) --> (e) --> (g)
+				//    ------^               ^
+				//   /                     /
+				// (✓) --> (›) ------------
+				Name:        "second layer",
+				Repository:  repo,
+				Run:         run,
+				Unclaimable: []*adagio.Node{nodeE, nodeG},
+				Claimable:   []*adagio.Node{nodeC, nodeD, nodeF},
+				Events: []adagio.Event{
+					{Node: nodeC, From: adagio.ReadyState, To: adagio.RunningState},
+					{Node: nodeC, From: adagio.RunningState, To: adagio.CompletedState},
+					{Node: nodeD, From: adagio.ReadyState, To: adagio.RunningState},
+					{Node: nodeD, From: adagio.RunningState, To: adagio.CompletedState},
+					{Node: nodeE, From: adagio.WaitingState, To: adagio.ReadyState},
+					{Node: nodeF, From: adagio.ReadyState, To: adagio.RunningState},
+					{Node: nodeF, From: adagio.RunningState, To: adagio.CompletedState},
+				},
+			},
+			{
+				// (✓) ---> (✓)----
+				//   \             \
+				//    ------v       v
+				//         (✓) --> (›) --> (g)
+				//    ------^               ^
+				//   /                     /
+				// (✓) --> (✓) ------------
+				Name:        "third layer",
+				Repository:  repo,
+				Run:         run,
+				Unclaimable: []*adagio.Node{nodeG},
+				Claimable:   []*adagio.Node{nodeE},
+				Events: []adagio.Event{
+					{Node: nodeE, From: adagio.ReadyState, To: adagio.RunningState},
+					{Node: nodeE, From: adagio.RunningState, To: adagio.CompletedState},
+					{Node: nodeG, From: adagio.WaitingState, To: adagio.ReadyState},
+				},
+			},
+			{
+				// (✓) ---> (✓)----
+				//   \             \
+				//    ------v       v
+				//         (✓) --> (✓) --> (›)
+				//    ------^               ^
+				//   /                     /
+				// (✓) --> (✓) ------------
+				Name:       "final layer",
+				Repository: repo,
+				Run:        run,
+				Claimable:  []*adagio.Node{nodeG},
+				Events: []adagio.Event{
+					{Node: nodeG, From: adagio.ReadyState, To: adagio.RunningState},
+					{Node: nodeG, From: adagio.RunningState, To: adagio.CompletedState},
+				},
+			},
+		} {
+			layer.Exec(t)
+		}
 	})
 }
 
-func testLayer(t *testing.T, name string, repo Repository, run *adagio.Run, notClaimed, claimed []*adagio.Node, expectedEvents ...adagio.Event) {
+type TestLayer struct {
+	Name        string
+	Repository  Repository
+	Run         *adagio.Run
+	Unclaimable []*adagio.Node
+	Claimable   []*adagio.Node
+	Events      []adagio.Event
+}
+
+func (l *TestLayer) Exec(t *testing.T) {
 	t.Helper()
 
 	var (
-		events    = make(chan adagio.Event, len(expectedEvents))
+		events    = make(chan adagio.Event, len(l.Events))
 		collected = make([]adagio.Event, 0)
-		err       = repo.Subscribe(events, adagio.ReadyState, adagio.RunningState, adagio.CompletedState)
+		err       = l.Repository.Subscribe(events, adagio.ReadyState, adagio.RunningState, adagio.CompletedState)
 	)
 	require.Nil(t, err)
 
 	defer func() {
-		if urepo, ok := repo.(UnsubscribeRepository); ok {
+		if urepo, ok := l.Repository.(UnsubscribeRepository); ok {
 			urepo.UnsubscribeAll(events)
 		}
 
 		close(events)
 	}()
 
-	t.Run(name, func(t *testing.T) {
-		canNotClaim(t, repo, run, notClaimed...)
+	t.Run(l.Name, func(t *testing.T) {
+		canNotClaim(t, l.Repository, l.Run, l.Unclaimable...)
 
-		canClaim(t, repo, run, claimed...)
+		canClaim(t, l.Repository, l.Run, l.Claimable...)
 	})
 
-	canFinish(t, repo, run, claimed...)
+	canFinish(t, l.Repository, l.Run, l.Claimable...)
 
-	for i := 0; i < len(expectedEvents); i++ {
+	for i := 0; i < len(l.Events); i++ {
 		select {
 		case event := <-events:
 			event.Run = nil
@@ -171,8 +208,8 @@ func testLayer(t *testing.T, name string, repo Repository, run *adagio.Run, notC
 		return collected[i].Node.Name < collected[j].Node.Name
 	})
 
-	if expectedEvents != nil {
-		assert.Equal(t, expectedEvents, collected)
+	if l.Events != nil {
+		assert.Equal(t, l.Events, collected)
 	}
 }
 
