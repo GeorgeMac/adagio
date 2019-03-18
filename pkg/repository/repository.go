@@ -7,9 +7,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/georgemac/adagio/internal/controlplaneservice"
 	"github.com/georgemac/adagio/pkg/adagio"
 	"github.com/georgemac/adagio/pkg/graph"
+	"github.com/georgemac/adagio/pkg/service/controlplane"
 	"github.com/georgemac/adagio/pkg/worker"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -46,7 +46,7 @@ func init() {
 }
 
 type Repository interface {
-	controlplaneservice.Repository
+	controlplane.Repository
 	worker.Repository
 }
 

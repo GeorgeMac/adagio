@@ -1,4 +1,4 @@
-package controlplaneservice
+package controlplane
 
 import (
 	"context"

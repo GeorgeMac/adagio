@@ -11,10 +11,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/georgemac/adagio/internal/controlplaneservice"
 	"github.com/georgemac/adagio/pkg/adagio"
 	"github.com/georgemac/adagio/pkg/memory"
 	"github.com/georgemac/adagio/pkg/rpc/controlplane"
+	controlservice "github.com/georgemac/adagio/pkg/service/controlplane"
 	"github.com/georgemac/adagio/pkg/worker"
 )
 
@@ -66,9 +66,9 @@ func main() {
 	wg.Wait()
 }
 
-func api(ctxt context.Context, repo controlplaneservice.Repository) {
+func api(ctxt context.Context, repo controlservice.Repository) {
 	var (
-		service = controlplaneservice.New(repo)
+		service = controlservice.New(repo)
 		mux     = controlplane.NewControlPlaneServer(service, nil)
 		server  = &http.Server{
 			Addr:    ":7890",
