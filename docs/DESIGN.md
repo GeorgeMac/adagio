@@ -93,3 +93,15 @@ type Repository interface {
 ```
 
 A test harness should be developed which can probe this interface and assert expecations for any implementation. The harness should enforce constraints such as one claim per node under concurrency access scenarios. As well as constraints around when nodes are in a state to be claimed (ready rather than waiting or executing).
+
+## Runtime Ideas
+
+- Simple language based runtime
+- Docker based runtime
+- Child process runtime
+- Lambda-like runtime
+
+## Bucket Of Left Over Thoughts
+
+- Typed inputs and outputs for nodes
+- Worked example of using adagio for continuous integration
