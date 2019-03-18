@@ -10,24 +10,22 @@ Adagio focusses primarily on orchestration of workflow execution. The execution 
 
 # Usage
 
-## adagio
+## adagio - cli
 
 The adagio cli tool communicates with the control plane API.
 
 ```
 adagio
 adagio help          # show adagio command usage
-adagio version       # show adagio version information
 
 adagio runs          # adagio runs usage
 
-adagio runs ls       # list runs
-adagio runs start    # create and start runs
-adagio runs inspect  # inspect a single run
-adagio runs stop     # stop an active run
+adagio runs ls             # list runs
+adagio runs start [file]   # create and start runs
+adagio runs start <stdin>
 ```
 
-## adagiod 
+## adagiod - service
 
 Contains both the adagio control plane and the runtime agent. The can serve both at the same time. Otherwise, it can be deployed seperately controlled via configuration.
 
@@ -37,8 +35,24 @@ adagiod api   # control plane
 adagiod agent # runtime agent
 ```
 
-# API Specification
+### adagiod api
 
-The current API specifications can be found within the documentation for this project.
+The `adagiod api` is a control plane daemon for an adagio system. It exposes the necessary interface for listing, inspecting and starting runs. It does so via the backing storage implementation.
 
-- [API V0](./docs/api/v0.md)
+The current specification is etched in protobuf. Client and Server code is generated using [Twirp](github.com/twitchtv/twirp).
+The proto files and generated code is located within the [control plane rpc](./rpc/controlplane) folder.
+
+### adagiod agent
+
+The `adagiod agent` is a daemon which consumes and processes nodes within graphs stored within a backing storage.
+
+# Building
+
+
+```
+make help      # Print description of the commands available
+make install   # Install adagio and adagiod
+make protobuf  # Build protocol buffers into twirp model and service definitions
+```
+
+see `make help` for details locally.

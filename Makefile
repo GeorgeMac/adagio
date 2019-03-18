@@ -3,7 +3,7 @@ install: ## Install adagio and adagiod
 	go install ./...
 
 .PHONY: protobuf
-protobuf: protobuf-deps ## Build protocol buffers and twirp services
+protobuf: protobuf-deps ## Build protocol buffers into twirp model and service definitions
 	protoc --twirp_out=. --go_out=. ./pkg/rpc/controlplane/service.proto
 
 protobuf-deps:
@@ -15,4 +15,4 @@ protobuf-deps:
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-.DEFAULT_GOAL := install
+.DEFAULT_GOAL := help
