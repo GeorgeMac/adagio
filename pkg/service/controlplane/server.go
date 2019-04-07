@@ -9,7 +9,7 @@ import (
 )
 
 type Repository interface {
-	StartRun(adagio.Graph) (*adagio.Run, error)
+	StartRun(*adagio.GraphSpec) (*adagio.Run, error)
 	ListRuns() ([]*adagio.Run, error)
 }
 
@@ -25,18 +25,13 @@ func New(repo Repository) *Service {
 	return s
 }
 
-func (s *Service) Start(_ context.Context, pbgraph *controlplane.Graph) (*controlplane.Run, error) {
-	graph, err := toAdagioGraph(pbgraph)
+func (s *Service) Start(_ context.Context, req *controlplane.StartRequest) (*controlplane.StartResponse, error) {
+	run, err := s.repo.StartRun(req.Spec)
 	if err != nil {
 		return nil, errors.Wrap(err, "control plane: starting run")
 	}
 
-	run, err := s.repo.StartRun(graph)
-	if err != nil {
-		return nil, errors.Wrap(err, "control plane: starting run")
-	}
-
-	return toPBRun(run), nil
+	return &controlplane.StartResponse{Run: run}, nil
 }
 
 func (s *Service) List(_ context.Context, _ *controlplane.ListRequest) (*controlplane.ListResponse, error) {
@@ -45,5 +40,5 @@ func (s *Service) List(_ context.Context, _ *controlplane.ListRequest) (*control
 		return nil, errors.Wrap(err, "control plane: listing runs")
 	}
 
-	return &controlplane.ListResponse{Runs: toPBRuns(runs...)}, nil
+	return &controlplane.ListResponse{Runs: runs}, nil
 }

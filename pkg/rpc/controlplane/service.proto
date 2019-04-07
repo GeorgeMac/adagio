@@ -2,31 +2,21 @@ syntax = "proto3";
 
 package adagio.rpc.controlplane;
 
-option go_package = "controlplane";
+option go_package = "pkg/rpc/controlplane";
+
+import "pkg/adagio/adagio.proto";
 
 service ControlPlane {
-  rpc Start(Graph) returns (Run);
+  rpc Start(StartRequest) returns (StartResponse);
   rpc List(ListRequest) returns (ListResponse);
 }
 
-message Graph {
-  repeated Node nodes = 1;
-  repeated Edge edges = 2;
+message StartRequest {
+  adagio.GraphSpec spec = 1;
 }
 
-message Node {
-  string name = 1;
-  string runtime = 2;
-}
-
-message Edge {
-  string source = 1;
-  string destination = 2;
-}
-
-message Run {
-  string id = 1;
-  string created_at = 2;
+message StartResponse {
+  adagio.Run run = 1;
 }
 
 message ListRequest {}

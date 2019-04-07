@@ -5,6 +5,7 @@ package controlplane
 
 import (
 	fmt "fmt"
+	adagio "github.com/georgemac/adagio/pkg/adagio"
 	proto "github.com/golang/protobuf/proto"
 	math "math"
 )
@@ -20,192 +21,82 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
-type Graph struct {
-	Nodes                []*Node  `protobuf:"bytes,1,rep,name=nodes,proto3" json:"nodes,omitempty"`
-	Edges                []*Edge  `protobuf:"bytes,2,rep,name=edges,proto3" json:"edges,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
+type StartRequest struct {
+	Spec                 *adagio.GraphSpec `protobuf:"bytes,1,opt,name=spec,proto3" json:"spec,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
+	XXX_unrecognized     []byte            `json:"-"`
+	XXX_sizecache        int32             `json:"-"`
 }
 
-func (m *Graph) Reset()         { *m = Graph{} }
-func (m *Graph) String() string { return proto.CompactTextString(m) }
-func (*Graph) ProtoMessage()    {}
-func (*Graph) Descriptor() ([]byte, []int) {
+func (m *StartRequest) Reset()         { *m = StartRequest{} }
+func (m *StartRequest) String() string { return proto.CompactTextString(m) }
+func (*StartRequest) ProtoMessage()    {}
+func (*StartRequest) Descriptor() ([]byte, []int) {
 	return fileDescriptor_44473a7dc25ad712, []int{0}
 }
 
-func (m *Graph) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Graph.Unmarshal(m, b)
+func (m *StartRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_StartRequest.Unmarshal(m, b)
 }
-func (m *Graph) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Graph.Marshal(b, m, deterministic)
+func (m *StartRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_StartRequest.Marshal(b, m, deterministic)
 }
-func (m *Graph) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Graph.Merge(m, src)
+func (m *StartRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StartRequest.Merge(m, src)
 }
-func (m *Graph) XXX_Size() int {
-	return xxx_messageInfo_Graph.Size(m)
+func (m *StartRequest) XXX_Size() int {
+	return xxx_messageInfo_StartRequest.Size(m)
 }
-func (m *Graph) XXX_DiscardUnknown() {
-	xxx_messageInfo_Graph.DiscardUnknown(m)
+func (m *StartRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_StartRequest.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_Graph proto.InternalMessageInfo
+var xxx_messageInfo_StartRequest proto.InternalMessageInfo
 
-func (m *Graph) GetNodes() []*Node {
+func (m *StartRequest) GetSpec() *adagio.GraphSpec {
 	if m != nil {
-		return m.Nodes
+		return m.Spec
 	}
 	return nil
 }
 
-func (m *Graph) GetEdges() []*Edge {
-	if m != nil {
-		return m.Edges
-	}
-	return nil
+type StartResponse struct {
+	Run                  *adagio.Run `protobuf:"bytes,1,opt,name=run,proto3" json:"run,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}    `json:"-"`
+	XXX_unrecognized     []byte      `json:"-"`
+	XXX_sizecache        int32       `json:"-"`
 }
 
-type Node struct {
-	Name                 string   `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Runtime              string   `protobuf:"bytes,2,opt,name=runtime,proto3" json:"runtime,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *Node) Reset()         { *m = Node{} }
-func (m *Node) String() string { return proto.CompactTextString(m) }
-func (*Node) ProtoMessage()    {}
-func (*Node) Descriptor() ([]byte, []int) {
+func (m *StartResponse) Reset()         { *m = StartResponse{} }
+func (m *StartResponse) String() string { return proto.CompactTextString(m) }
+func (*StartResponse) ProtoMessage()    {}
+func (*StartResponse) Descriptor() ([]byte, []int) {
 	return fileDescriptor_44473a7dc25ad712, []int{1}
 }
 
-func (m *Node) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Node.Unmarshal(m, b)
+func (m *StartResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_StartResponse.Unmarshal(m, b)
 }
-func (m *Node) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Node.Marshal(b, m, deterministic)
+func (m *StartResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_StartResponse.Marshal(b, m, deterministic)
 }
-func (m *Node) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Node.Merge(m, src)
+func (m *StartResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_StartResponse.Merge(m, src)
 }
-func (m *Node) XXX_Size() int {
-	return xxx_messageInfo_Node.Size(m)
+func (m *StartResponse) XXX_Size() int {
+	return xxx_messageInfo_StartResponse.Size(m)
 }
-func (m *Node) XXX_DiscardUnknown() {
-	xxx_messageInfo_Node.DiscardUnknown(m)
+func (m *StartResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_StartResponse.DiscardUnknown(m)
 }
 
-var xxx_messageInfo_Node proto.InternalMessageInfo
+var xxx_messageInfo_StartResponse proto.InternalMessageInfo
 
-func (m *Node) GetName() string {
+func (m *StartResponse) GetRun() *adagio.Run {
 	if m != nil {
-		return m.Name
+		return m.Run
 	}
-	return ""
-}
-
-func (m *Node) GetRuntime() string {
-	if m != nil {
-		return m.Runtime
-	}
-	return ""
-}
-
-type Edge struct {
-	Source               string   `protobuf:"bytes,1,opt,name=source,proto3" json:"source,omitempty"`
-	Destination          string   `protobuf:"bytes,2,opt,name=destination,proto3" json:"destination,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *Edge) Reset()         { *m = Edge{} }
-func (m *Edge) String() string { return proto.CompactTextString(m) }
-func (*Edge) ProtoMessage()    {}
-func (*Edge) Descriptor() ([]byte, []int) {
-	return fileDescriptor_44473a7dc25ad712, []int{2}
-}
-
-func (m *Edge) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Edge.Unmarshal(m, b)
-}
-func (m *Edge) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Edge.Marshal(b, m, deterministic)
-}
-func (m *Edge) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Edge.Merge(m, src)
-}
-func (m *Edge) XXX_Size() int {
-	return xxx_messageInfo_Edge.Size(m)
-}
-func (m *Edge) XXX_DiscardUnknown() {
-	xxx_messageInfo_Edge.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Edge proto.InternalMessageInfo
-
-func (m *Edge) GetSource() string {
-	if m != nil {
-		return m.Source
-	}
-	return ""
-}
-
-func (m *Edge) GetDestination() string {
-	if m != nil {
-		return m.Destination
-	}
-	return ""
-}
-
-type Run struct {
-	Id                   string   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	CreatedAt            string   `protobuf:"bytes,2,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *Run) Reset()         { *m = Run{} }
-func (m *Run) String() string { return proto.CompactTextString(m) }
-func (*Run) ProtoMessage()    {}
-func (*Run) Descriptor() ([]byte, []int) {
-	return fileDescriptor_44473a7dc25ad712, []int{3}
-}
-
-func (m *Run) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Run.Unmarshal(m, b)
-}
-func (m *Run) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Run.Marshal(b, m, deterministic)
-}
-func (m *Run) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Run.Merge(m, src)
-}
-func (m *Run) XXX_Size() int {
-	return xxx_messageInfo_Run.Size(m)
-}
-func (m *Run) XXX_DiscardUnknown() {
-	xxx_messageInfo_Run.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Run proto.InternalMessageInfo
-
-func (m *Run) GetId() string {
-	if m != nil {
-		return m.Id
-	}
-	return ""
-}
-
-func (m *Run) GetCreatedAt() string {
-	if m != nil {
-		return m.CreatedAt
-	}
-	return ""
+	return nil
 }
 
 type ListRequest struct {
@@ -218,7 +109,7 @@ func (m *ListRequest) Reset()         { *m = ListRequest{} }
 func (m *ListRequest) String() string { return proto.CompactTextString(m) }
 func (*ListRequest) ProtoMessage()    {}
 func (*ListRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_44473a7dc25ad712, []int{4}
+	return fileDescriptor_44473a7dc25ad712, []int{2}
 }
 
 func (m *ListRequest) XXX_Unmarshal(b []byte) error {
@@ -240,17 +131,17 @@ func (m *ListRequest) XXX_DiscardUnknown() {
 var xxx_messageInfo_ListRequest proto.InternalMessageInfo
 
 type ListResponse struct {
-	Runs                 []*Run   `protobuf:"bytes,1,rep,name=runs,proto3" json:"runs,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
+	Runs                 []*adagio.Run `protobuf:"bytes,1,rep,name=runs,proto3" json:"runs,omitempty"`
+	XXX_NoUnkeyedLiteral struct{}      `json:"-"`
+	XXX_unrecognized     []byte        `json:"-"`
+	XXX_sizecache        int32         `json:"-"`
 }
 
 func (m *ListResponse) Reset()         { *m = ListResponse{} }
 func (m *ListResponse) String() string { return proto.CompactTextString(m) }
 func (*ListResponse) ProtoMessage()    {}
 func (*ListResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_44473a7dc25ad712, []int{5}
+	return fileDescriptor_44473a7dc25ad712, []int{3}
 }
 
 func (m *ListResponse) XXX_Unmarshal(b []byte) error {
@@ -271,7 +162,7 @@ func (m *ListResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_ListResponse proto.InternalMessageInfo
 
-func (m *ListResponse) GetRuns() []*Run {
+func (m *ListResponse) GetRuns() []*adagio.Run {
 	if m != nil {
 		return m.Runs
 	}
@@ -279,10 +170,8 @@ func (m *ListResponse) GetRuns() []*Run {
 }
 
 func init() {
-	proto.RegisterType((*Graph)(nil), "adagio.rpc.controlplane.Graph")
-	proto.RegisterType((*Node)(nil), "adagio.rpc.controlplane.Node")
-	proto.RegisterType((*Edge)(nil), "adagio.rpc.controlplane.Edge")
-	proto.RegisterType((*Run)(nil), "adagio.rpc.controlplane.Run")
+	proto.RegisterType((*StartRequest)(nil), "adagio.rpc.controlplane.StartRequest")
+	proto.RegisterType((*StartResponse)(nil), "adagio.rpc.controlplane.StartResponse")
 	proto.RegisterType((*ListRequest)(nil), "adagio.rpc.controlplane.ListRequest")
 	proto.RegisterType((*ListResponse)(nil), "adagio.rpc.controlplane.ListResponse")
 }
@@ -290,26 +179,21 @@ func init() {
 func init() { proto.RegisterFile("pkg/rpc/controlplane/service.proto", fileDescriptor_44473a7dc25ad712) }
 
 var fileDescriptor_44473a7dc25ad712 = []byte{
-	// 327 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x84, 0x92, 0xcd, 0x6e, 0xe2, 0x30,
-	0x10, 0x80, 0x95, 0x10, 0x58, 0x31, 0xb0, 0x1c, 0xe6, 0xb0, 0x1b, 0xa1, 0x65, 0x85, 0xa2, 0x56,
-	0xe2, 0x14, 0x2a, 0xe0, 0x01, 0x68, 0x2b, 0xd4, 0x4b, 0x55, 0x55, 0xe6, 0xd6, 0x4b, 0xe5, 0xc6,
-	0xa3, 0xd4, 0x2a, 0xd8, 0xc6, 0x76, 0xfa, 0x50, 0x7d, 0xca, 0x2a, 0x3f, 0x48, 0xb9, 0xa4, 0xdc,
-	0x3c, 0x33, 0xdf, 0x37, 0xf2, 0x8c, 0x0d, 0x89, 0xf9, 0xc8, 0x97, 0xd6, 0x64, 0xcb, 0x4c, 0x2b,
-	0x6f, 0xf5, 0xc1, 0x1c, 0xb8, 0xa2, 0xa5, 0x23, 0xfb, 0x29, 0x33, 0x4a, 0x8d, 0xd5, 0x5e, 0xe3,
-	0x5f, 0x2e, 0x78, 0x2e, 0x75, 0x6a, 0x4d, 0x96, 0xb6, 0xb1, 0xe4, 0x04, 0xfd, 0x07, 0xcb, 0xcd,
-	0x3b, 0xae, 0xa1, 0xaf, 0xb4, 0x20, 0x17, 0x07, 0xf3, 0xde, 0x62, 0xb4, 0x9a, 0xa5, 0x1d, 0x46,
-	0xfa, 0xa4, 0x05, 0xb1, 0x9a, 0x2d, 0x25, 0x12, 0x39, 0xb9, 0x38, 0xbc, 0x20, 0xed, 0x44, 0x4e,
-	0xac, 0x66, 0x93, 0x0d, 0x44, 0x65, 0x0f, 0x44, 0x88, 0x14, 0x3f, 0x52, 0x1c, 0xcc, 0x83, 0xc5,
-	0x90, 0x55, 0x67, 0x8c, 0xe1, 0x97, 0x2d, 0x94, 0x97, 0x47, 0x8a, 0xc3, 0x2a, 0x7d, 0x0e, 0x93,
-	0x2d, 0x44, 0x65, 0x13, 0xfc, 0x03, 0x03, 0xa7, 0x0b, 0x9b, 0x9d, 0xbd, 0x26, 0xc2, 0x39, 0x8c,
-	0x04, 0x39, 0x2f, 0x15, 0xf7, 0x52, 0xab, 0xc6, 0x6e, 0xa7, 0x92, 0x0d, 0xf4, 0x58, 0xa1, 0x70,
-	0x02, 0xa1, 0x14, 0x8d, 0x1c, 0x4a, 0x81, 0x33, 0x80, 0xcc, 0x12, 0xf7, 0x24, 0x5e, 0xb9, 0x6f,
-	0xbc, 0x61, 0x93, 0xb9, 0xf5, 0xc9, 0x6f, 0x18, 0x3d, 0x4a, 0xe7, 0x19, 0x9d, 0x0a, 0x72, 0x3e,
-	0xd9, 0xc2, 0xb8, 0x0e, 0x9d, 0xd1, 0xca, 0x11, 0xde, 0x40, 0x64, 0x0b, 0x75, 0xde, 0xda, 0xbf,
-	0xce, 0x05, 0xb0, 0x42, 0xb1, 0x8a, 0x5c, 0x7d, 0x05, 0x30, 0xbe, 0xaf, 0x4b, 0xcf, 0x65, 0x09,
-	0x77, 0xd0, 0xdf, 0x7b, 0x6e, 0x3d, 0xfe, 0xef, 0xb4, 0xab, 0x27, 0x9a, 0xfe, 0xd8, 0x1d, 0xf7,
-	0x10, 0x95, 0x37, 0xc3, 0xab, 0x4e, 0xaa, 0x35, 0xc7, 0xf4, 0xfa, 0x02, 0x55, 0x8f, 0x77, 0x37,
-	0x79, 0x19, 0xb7, 0x8b, 0x6f, 0x83, 0xea, 0x3b, 0xad, 0xbf, 0x03, 0x00, 0x00, 0xff, 0xff, 0x6b,
-	0x4c, 0xdc, 0x78, 0x74, 0x02, 0x00, 0x00,
+	// 254 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x84, 0x91, 0x41, 0x4b, 0xc4, 0x30,
+	0x10, 0x85, 0x29, 0x5b, 0x3d, 0x4c, 0xbb, 0x07, 0x83, 0xb8, 0x4b, 0x41, 0x5c, 0x82, 0x15, 0x4f,
+	0x29, 0xac, 0xf8, 0x07, 0xf4, 0xe0, 0xc5, 0x83, 0xb4, 0xe0, 0xc1, 0x5b, 0x8c, 0x61, 0x2d, 0x2e,
+	0xc9, 0x38, 0x49, 0xfd, 0x73, 0xfe, 0x39, 0x69, 0x92, 0x85, 0x22, 0xbb, 0xec, 0x29, 0x24, 0xef,
+	0x7d, 0x99, 0xf7, 0x18, 0xe0, 0xf8, 0xb5, 0x69, 0x08, 0x55, 0xa3, 0xac, 0xf1, 0x64, 0xb7, 0xb8,
+	0x95, 0x46, 0x37, 0x4e, 0xd3, 0x4f, 0xaf, 0xb4, 0x40, 0xb2, 0xde, 0xb2, 0x85, 0xfc, 0x90, 0x9b,
+	0xde, 0x0a, 0x42, 0x25, 0xa6, 0xb6, 0x6a, 0x31, 0xc2, 0x51, 0x4c, 0x47, 0x24, 0xf8, 0x3d, 0x94,
+	0x9d, 0x97, 0xe4, 0x5b, 0xfd, 0x3d, 0x68, 0xe7, 0x59, 0x0d, 0xb9, 0x43, 0xad, 0x96, 0xd9, 0x2a,
+	0xbb, 0x2d, 0xd6, 0x67, 0x22, 0x99, 0x9f, 0x48, 0xe2, 0x67, 0x87, 0x5a, 0xb5, 0x41, 0xe6, 0x02,
+	0xe6, 0x09, 0x73, 0x68, 0x8d, 0xd3, 0xec, 0x12, 0x66, 0x34, 0x98, 0x84, 0x15, 0x3b, 0xac, 0x1d,
+	0x4c, 0x3b, 0xbe, 0xf3, 0x39, 0x14, 0xcf, 0xbd, 0xdb, 0x4d, 0xe1, 0x0d, 0x94, 0xf1, 0x9a, 0xe8,
+	0x2b, 0xc8, 0x69, 0x30, 0x6e, 0x99, 0xad, 0x66, 0xff, 0xf1, 0x20, 0xac, 0x7f, 0x33, 0x28, 0x1f,
+	0x63, 0xa1, 0x97, 0xb1, 0x10, 0x7b, 0x85, 0x93, 0x10, 0x80, 0xd5, 0xe2, 0x40, 0x67, 0x31, 0xed,
+	0x55, 0xdd, 0x1c, 0xb3, 0xa5, 0x24, 0x1d, 0xe4, 0x63, 0x32, 0x76, 0x7d, 0xd0, 0x3f, 0xe9, 0x51,
+	0xd5, 0x47, 0x5c, 0xf1, 0xd3, 0x87, 0x8b, 0xb7, 0xf3, 0x7d, 0xcb, 0x7b, 0x3f, 0x0d, 0x3b, 0xb8,
+	0xfb, 0x0b, 0x00, 0x00, 0xff, 0xff, 0x6d, 0x09, 0xe1, 0xef, 0xdb, 0x01, 0x00, 0x00,
 }
