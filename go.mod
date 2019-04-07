@@ -38,7 +38,7 @@ require (
 	github.com/spf13/pflag v1.0.3 // indirect
 	github.com/stamblerre/gocode v0.0.0-20190213022308-8cc90faaf476 // indirect
 	github.com/stretchr/testify v1.3.0
-	github.com/twitchtv/twirp v5.5.2+incompatible
+	github.com/twitchtv/twirp v5.6.0+incompatible
 	github.com/zmb3/gogetdoc v0.0.0-20190228002656-b37376c5da6a // indirect
 	golang.org/x/arch v0.0.0-20190312162104-788fe5ffcd8c // indirect
 	golang.org/x/crypto v0.0.0-20190313024323-a1f597ede03a // indirect

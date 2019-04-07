@@ -114,6 +114,8 @@ github.com/stretchr/testify v1.3.0 h1:TivCn/peBQ7UY8ooIcPgZFpTNSz0Q2U6UrFlUfqbe0
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/twitchtv/twirp v5.5.2+incompatible h1:A2a6kqqvcMJIhjbvL0+1cCuIgwudBTYG91BlqaCaNso=
 github.com/twitchtv/twirp v5.5.2+incompatible/go.mod h1:RRJoFSAmTEh2weEqWtpPE3vFK5YBhA6bqp2l1kfCC5A=
+github.com/twitchtv/twirp v5.6.0+incompatible h1:sUqlJqdfCAIPDShsmjo3Gixzccs1KWCtFctfpNYcnPE=
+github.com/twitchtv/twirp v5.6.0+incompatible/go.mod h1:RRJoFSAmTEh2weEqWtpPE3vFK5YBhA6bqp2l1kfCC5A=
 github.com/zmb3/gogetdoc v0.0.0-20190228002656-b37376c5da6a h1:00UFliGZl2UciXe8o/2iuEsRQ9u7z0rzDTVzuj6EYY0=
 github.com/zmb3/gogetdoc v0.0.0-20190228002656-b37376c5da6a/go.mod h1:ofmGw6LrMypycsiWcyug6516EXpIxSbZ+uI9ppGypfY=
 go.etcd.io/etcd v3.3.12+incompatible h1:V6PRYRGpU4k5EajJaaj/GL3hqIdzyPnBU8aPUp+35yw=
