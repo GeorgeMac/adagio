@@ -40,7 +40,7 @@ adagiod agent # runtime agent
 The `adagiod api` is a control plane daemon for an adagio system. It exposes the necessary interface for listing, inspecting and starting runs. It does so via the backing storage implementation.
 
 The current specification is etched in protobuf. Client and Server code is generated using [Twirp](github.com/twitchtv/twirp).
-The proto files and generated code is located within the [control plane rpc](./rpc/controlplane) folder.
+The proto files and generated code is located within the [controlplane rpc](./pkg/rpc/controlplane) folder.
 
 ### adagiod agent
 
