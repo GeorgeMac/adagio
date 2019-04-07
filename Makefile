@@ -2,13 +2,18 @@
 install: ## Install adagio and adagiod
 	go install ./...
 
+.PHONY: deps
+deps: ## Fetch and vendor dependencies
+	go mod vendor
+
 .PHONY: protobuf
 protobuf: protobuf-deps ## Build protocol buffers into twirp model and service definitions
-	protoc --twirp_out=. --go_out=. ./pkg/rpc/controlplane/service.proto
+	protoc --go_out=paths=source_relative:. ./pkg/adagio/adagio.proto
+	protoc -I. --twirp_out=. --go_out=. ./pkg/rpc/controlplane/service.proto
 
-protobuf-deps:
-	go get github.com/twitchtv/twirp/protoc-gen-twirp
-	go get github.com/golang/protobuf/protoc-gen-go
+protobuf-deps: ## Fetch protobuf dependencies
+	@go get github.com/twitchtv/twirp/protoc-gen-twirp
+	@go get github.com/golang/protobuf/protoc-gen-go
 
 # Absolutely awesome: http://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
 .PHONY: help
