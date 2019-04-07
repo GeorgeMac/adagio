@@ -5,9 +5,8 @@ import (
 )
 
 var (
-	ErrDuplicateNode       = errors.New("node already exists in graph")
-	ErrMissingNode         = errors.New("node is not present in graph")
-	ErrCannotContainCycles = errors.New("cannot contain cycles")
+	ErrDuplicateNode = errors.New("node already exists in graph")
+	ErrMissingNode   = errors.New("node is not present in graph")
 )
 
 type (

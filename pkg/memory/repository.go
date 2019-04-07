@@ -1,81 +1,76 @@
 package memory
 
 import (
-	"io"
-	"math/rand"
 	"sync"
-	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
+	"github.com/georgemac/adagio/pkg/graph"
 	"github.com/georgemac/adagio/pkg/worker"
-	"github.com/oklog/ulid"
 	"github.com/pkg/errors"
 )
 
-// compile time check to ensure Repository is a worker.Repository
-var _ worker.Repository = (*Repository)(nil)
+var (
+	// compile time check to ensure Repository is a worker.Repository
+	_ worker.Repository = (*Repository)(nil)
+)
 
 type (
 	nodeSet     map[*adagio.Node]struct{}
-	listenerSet map[adagio.NodeState][]chan<- adagio.Event
+	listenerSet map[adagio.Node_State][]chan<- *adagio.Event
+
+	runState struct {
+		run    *adagio.Run
+		lookup map[string]*adagio.Node
+		graph  *graph.Graph
+	}
 )
 
 type Repository struct {
-	runs    map[string]*adagio.Run
-	waiting map[*adagio.Node]nodeSet
-
-	ready,
-	running,
-	done,
-	dead nodeSet
+	runs map[string]runState
 
 	listeners listenerSet
-
-	entropy io.Reader
 
 	mu sync.Mutex
 }
 
 func New() *Repository {
 	return &Repository{
-		runs:      map[string]*adagio.Run{},
-		waiting:   map[*adagio.Node]nodeSet{},
-		ready:     nodeSet{},
-		running:   nodeSet{},
-		done:      nodeSet{},
-		dead:      nodeSet{},
+		runs:      map[string]runState{},
 		listeners: listenerSet{},
-		entropy:   ulid.Monotonic(rand.New(rand.NewSource(time.Now().UnixNano())), 0),
 	}
 }
 
-func (r *Repository) StartRun(graph adagio.Graph) (run *adagio.Run, err error) {
+func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	now := time.Now().UTC()
-
-	run = &adagio.Run{
-		ID:        ulid.MustNew(ulid.Timestamp(now), r.entropy).String(),
-		CreatedAt: now,
-		Graph:     graph,
+	run, err = adagio.NewRun(spec)
+	if err != nil {
+		return
 	}
 
-	r.runs[run.ID] = run
+	state := runState{
+		run:    run,
+		lookup: map[string]*adagio.Node{},
+		graph:  adagio.GraphFrom(run),
+	}
 
-	run.Graph.Walk(func(node *adagio.Node) {
-		if ready, _ := run.Graph.IsRoot(node); ready {
-			r.notifyListeners(run, node, adagio.NoneState, adagio.ReadyState)
-			r.ready[node] = struct{}{}
-			return
-		}
+	r.runs[run.Id] = state
 
-		r.notifyListeners(run, node, adagio.NoneState, adagio.WaitingState)
-		r.waiting[node], err = run.Graph.Incoming(node)
+	for _, node := range run.Nodes {
+		state.lookup[node.Spec.Name] = node
+
+		incoming, err := state.graph.Incoming(node)
 		if err != nil {
-			return
+			return nil, err
 		}
-	})
+
+		if len(incoming) == 0 {
+			node.State = adagio.Node_READY
+
+			r.notifyListeners(run, node, adagio.Node_WAITING, adagio.Node_READY)
+		}
+	}
 
 	return
 }
@@ -84,83 +79,97 @@ func (r *Repository) ListRuns() (runs []*adagio.Run, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	for _, run := range r.runs {
-		runs = append(runs, run)
+	for _, state := range r.runs {
+		runs = append(runs, state.run)
 	}
 
 	return
 }
 
-func (r *Repository) ClaimNode(run *adagio.Run, node *adagio.Node) (bool, error) {
+func (r *Repository) ClaimNode(run *adagio.Run, name string) (*adagio.Node, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if err := r.runMustExist(run); err != nil {
-		return false, err
+	state, err := r.state(run.Id)
+	if err != nil {
+		return nil, false, err
 	}
 
-	if err := r.mustNotBeWaiting(node); err != nil {
-		return false, err
+	node, ok := state.lookup[name]
+	if !ok {
+		return nil, false, errors.Wrapf(adagio.ErrMissingNode, "in-memory repository: node %q", name)
 	}
 
-	if _, ok := r.ready[node]; !ok {
-		// node not ready
-		return false, nil
+	if node.State == adagio.Node_WAITING {
+		return nil, false, errors.Wrapf(adagio.ErrNodeNotReady, "in-memory repository: node %q", node)
 	}
 
-	delete(r.ready, node)
+	// node already claimed
+	if node.State > adagio.Node_READY {
+		return nil, false, nil
+	}
 
-	r.running[node] = struct{}{}
+	node.State = adagio.Node_RUNNING
 
-	r.notifyListeners(run, node, adagio.ReadyState, adagio.RunningState)
+	r.notifyListeners(run, node, adagio.Node_READY, adagio.Node_RUNNING)
 
-	return true, nil
+	return node, true, nil
 }
 
-func (r *Repository) notifyListeners(run *adagio.Run, node *adagio.Node, from, to adagio.NodeState) {
+func (r *Repository) notifyListeners(run *adagio.Run, node *adagio.Node, from, to adagio.Node_State) {
+	nodeCopy := *node
 	for _, ch := range r.listeners[to] {
 		select {
-		case ch <- adagio.Event{run, node, from, to}:
+		case ch <- &adagio.Event{Run: run, Node: &nodeCopy, From: from, To: to}:
 			// attempt to send
 		default:
 		}
 	}
 }
 
-func (r *Repository) FinishNode(run *adagio.Run, node *adagio.Node) error {
+func (r *Repository) FinishNode(run *adagio.Run, name string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if err := r.runMustExist(run); err != nil {
+	state, err := r.state(run.Id)
+	if err != nil {
 		return err
 	}
 
-	if _, ok := r.running[node]; !ok {
-		return errors.New("cannot finish node in this state")
+	node, err := node(state, name)
+	if err != nil {
+		return err
 	}
 
-	outgoing, err := run.Graph.Outgoing(node)
+	node.State = adagio.Node_COMPLETED
+
+	r.notifyListeners(run, node, adagio.Node_RUNNING, adagio.Node_COMPLETED)
+
+	outgoing, err := state.graph.Outgoing(node)
 	if err != nil {
 		return errors.Wrapf(err, "finishing node %q", node)
 	}
 
-	for out := range outgoing {
-		delete(r.waiting[out], node)
+	for outi := range outgoing {
+		out := outi.(*adagio.Node)
+		incoming, err := state.graph.Incoming(out)
+		if err != nil {
+			return errors.Wrapf(err, "finishing node %q", node)
+		}
 
-		if len(r.waiting[out]) == 0 {
-			// if it no longer is blocked by anything
-			delete(r.waiting, out)
-			r.ready[out] = struct{}{}
+		// given all the incoming nodes into "out" are now completed
+		// then the waiting out node can be progressed to ready
+		ready := true
+		for in := range incoming {
+			ready = ready && in.(*adagio.Node).State == adagio.Node_COMPLETED
+		}
 
-			r.notifyListeners(run, out, adagio.WaitingState, adagio.ReadyState)
+		if ready {
+			out.State = adagio.Node_READY
+
+			r.notifyListeners(run, out, adagio.Node_WAITING, adagio.Node_READY)
 		}
 	}
-
-	delete(r.running, node)
-
-	r.done[node] = struct{}{}
-
-	r.notifyListeners(run, node, adagio.RunningState, adagio.CompletedState)
 
 	return nil
 }
@@ -169,7 +178,7 @@ func (r *Repository) BuryNode(*adagio.Run, *adagio.Node) error {
 	panic("not implemented")
 }
 
-func (r *Repository) Subscribe(events chan<- adagio.Event, states ...adagio.NodeState) error {
+func (r *Repository) Subscribe(events chan<- *adagio.Event, states ...adagio.Node_State) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -180,7 +189,7 @@ func (r *Repository) Subscribe(events chan<- adagio.Event, states ...adagio.Node
 	return nil
 }
 
-func (r *Repository) UnsubscribeAll(events chan<- adagio.Event) error {
+func (r *Repository) UnsubscribeAll(events chan<- *adagio.Event) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -196,18 +205,20 @@ func (r *Repository) UnsubscribeAll(events chan<- adagio.Event) error {
 	return nil
 }
 
-func (r *Repository) runMustExist(run *adagio.Run) error {
-	if _, ok := r.runs[run.ID]; !ok {
-		return errors.Wrapf(adagio.ErrRunDoesNotExist, "in-memory repository: run %q", run)
+func (r *Repository) state(runID string) (runState, error) {
+	state, ok := r.runs[runID]
+	if !ok {
+		return runState{}, errors.Wrapf(adagio.ErrRunDoesNotExist, "in-memory repository: run %q", runID)
 	}
 
-	return nil
+	return state, nil
 }
 
-func (r *Repository) mustNotBeWaiting(node *adagio.Node) error {
-	if _, ok := r.waiting[node]; ok {
-		return errors.Wrapf(adagio.ErrNodeNotReady, "in-memory repository: node %q", node)
+func node(state runState, name string) (*adagio.Node, error) {
+	node, ok := state.lookup[name]
+	if !ok {
+		return nil, errors.Wrapf(adagio.ErrMissingNode, "in-memory repository: node %q", name)
 	}
 
-	return nil
+	return node, nil
 }
