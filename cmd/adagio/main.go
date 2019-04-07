@@ -9,6 +9,7 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/georgemac/adagio/pkg/adagio"
 	"github.com/georgemac/adagio/pkg/rpc/controlplane"
 )
 
@@ -78,7 +79,9 @@ func printStartUsage() {
 
 func start(client controlplane.ControlPlane) {
 	var (
-		graph = &controlplane.Graph{}
+		req = &controlplane.StartRequest{
+			Spec: &adagio.GraphSpec{},
+		}
 		input io.Reader
 	)
 
@@ -96,17 +99,17 @@ func start(client controlplane.ControlPlane) {
 		input = fi
 	}
 
-	if err := json.NewDecoder(input).Decode(graph); err != nil {
+	if err := json.NewDecoder(input).Decode(req.Spec); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 
 	}
 
-	run, err := client.Start(context.Background(), graph)
+	resp, err := client.Start(context.Background(), req)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Run started %q\n", run.Id)
+	fmt.Printf("Run started %q\n", resp.Run.Id)
 }
