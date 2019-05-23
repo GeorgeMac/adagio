@@ -60,14 +60,7 @@ func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err erro
 	for _, node := range run.Nodes {
 		state.lookup[node.Spec.Name] = node
 
-		incoming, err := state.graph.Incoming(node)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(incoming) == 0 {
-			node.State = adagio.Node_READY
-
+		if node.State == adagio.Node_READY {
 			r.notifyListeners(run, node, adagio.Node_WAITING, adagio.Node_READY)
 		}
 	}
