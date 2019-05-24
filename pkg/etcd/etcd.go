@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
@@ -16,10 +17,20 @@ import (
 type Repository struct {
 	kv      clientv3.KV
 	watcher clientv3.Watcher
+
+	mu            sync.Mutex
+	subscriptions map[chan<- *adagio.Event]chan struct{}
+
+	now func() time.Time
 }
 
 func New(kv clientv3.KV, watcher clientv3.Watcher) *Repository {
-	return &Repository{kv, watcher}
+	return &Repository{
+		kv:            kv,
+		watcher:       watcher,
+		mu:            sync.Mutex{},
+		subscriptions: map[chan<- *adagio.Event]chan struct{}{},
+	}
 }
 
 func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err error) {
@@ -111,13 +122,18 @@ func (r *Repository) ListRuns() (runs []*adagio.Run, err error) {
 
 func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
 	ctxt := context.Background()
-	node, err := r.getNode(ctxt, nodeInStateKey(runID, name, "ready"))
+	run, err := r.getRun(ctxt, runID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	node, err := run.GetNodeByName(name)
 	if err != nil {
 		return nil, false, err
 	}
 
 	if node.State != adagio.Node_READY {
-		return nil, false, errors.New("node not ready")
+		return nil, false, adagio.ErrNodeNotReady
 	}
 
 	cmps, ops, err := r.transition(ctxt, runID, node, adagio.Node_RUNNING)
@@ -131,6 +147,10 @@ func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
 		Commit()
 	if err != nil {
 		return nil, false, err
+	}
+
+	if !resp.Succeeded {
+		return nil, false, nil
 	}
 
 	return node, resp.Succeeded, nil
@@ -156,9 +176,9 @@ func (r *Repository) transition(ctxt context.Context, runID string, node *adagio
 
 	switch toState {
 	case adagio.Node_RUNNING:
-		node.StartedAt = time.Now().Format(time.RFC3339)
+		node.StartedAt = r.now().Format(time.RFC3339)
 	case adagio.Node_COMPLETED:
-		node.FinishedAt = time.Now().Format(time.RFC3339)
+		node.FinishedAt = r.now().Format(time.RFC3339)
 	}
 
 	data, err := json.Marshal(node)
@@ -216,7 +236,6 @@ func (r *Repository) FinishNode(runID, name string) error {
 		for v := range incoming {
 			in := v.(*adagio.Node)
 
-			fmt.Println(out, in)
 			isReady = isReady && in.State == adagio.Node_COMPLETED
 
 			if in == node {
@@ -261,8 +280,23 @@ func (r *Repository) FinishNode(runID, name string) error {
 }
 
 func (r *Repository) Subscribe(events chan<- *adagio.Event, s ...adagio.Node_State) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	ch := make(chan struct{})
+
+	r.subscriptions[events] = ch
+
 	go func() {
-		for resp := range r.watcher.Watch(context.Background(), "states/", clientv3.WithPrefix()) {
+		watch := r.watcher.Watch(context.Background(), "states/", clientv3.WithPrefix())
+		for {
+			var resp clientv3.WatchResponse
+			select {
+			case <-ch:
+				return
+			case resp = <-watch:
+			}
+
 			if resp.Err() != nil {
 				log.Println(resp.Err())
 				continue
@@ -270,22 +304,24 @@ func (r *Repository) Subscribe(events chan<- *adagio.Event, s ...adagio.Node_Sta
 
 			if len(resp.Events) > 0 {
 				for _, ev := range resp.Events {
-					keyParts := strings.Split(string(ev.Kv.Key), "/")
-					if len(keyParts) < 6 {
-						continue
-					}
+					if ev.IsCreate() {
+						keyParts := strings.Split(string(ev.Kv.Key), "/")
+						if len(keyParts) < 6 {
+							continue
+						}
 
-					state, err := stateFromString(keyParts[1])
-					if err != nil {
-						log.Println(err)
-						continue
-					}
+						state, err := stateFromString(keyParts[1])
+						if err != nil {
+							log.Println(err)
+							continue
+						}
 
-					if states(s).contains(state) {
-						events <- &adagio.Event{
-							Type:     adagio.Event_STATE_TRANSITION,
-							RunID:    keyParts[3],
-							NodeName: keyParts[5],
+						if states(s).contains(state) {
+							events <- &adagio.Event{
+								Type:     adagio.Event_STATE_TRANSITION,
+								RunID:    keyParts[3],
+								NodeName: keyParts[5],
+							}
 						}
 					}
 				}
@@ -331,7 +367,7 @@ func (r *Repository) getNode(ctxt context.Context, key string) (*adagio.Node, er
 	}
 
 	if len(resp.Kvs) < 1 {
-		return nil, errors.New("node not found")
+		return nil, adagio.ErrMissingNode
 	}
 
 	return node, json.Unmarshal(resp.Kvs[0].Value, node)
@@ -359,6 +395,19 @@ func (r *Repository) nodesForRun(ctxt context.Context, id string) (nodes []*adag
 	}
 
 	return
+}
+
+func (r *Repository) UnsubscribeAll(ch chan<- *adagio.Event) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if signal, ok := r.subscriptions[ch]; ok {
+		signal <- struct{}{}
+
+		delete(r.subscriptions, ch)
+	}
+
+	return nil
 }
 
 type run struct {
@@ -400,21 +449,6 @@ func (s states) contains(state adagio.Node_State) bool {
 	}
 
 	return false
-}
-
-func match(states states, state string) (bool, error) {
-	switch state {
-	case "waiting":
-		return states.contains(adagio.Node_WAITING), nil
-	case "ready":
-		return states.contains(adagio.Node_READY), nil
-	case "running":
-		return states.contains(adagio.Node_RUNNING), nil
-	case "completed":
-		return states.contains(adagio.Node_COMPLETED), nil
-	default:
-		return false, errors.New("state not recognized")
-	}
 }
 
 func stateFromString(state string) (adagio.Node_State, error) {

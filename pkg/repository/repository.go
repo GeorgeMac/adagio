@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
 	"github.com/georgemac/adagio/pkg/service/controlplane"
@@ -24,6 +25,8 @@ var (
 	e = &adagio.Node_Spec{Name: "e"}
 	f = &adagio.Node_Spec{Name: "f"}
 	g = &adagio.Node_Spec{Name: "g"}
+
+	when = time.Date(2019, 5, 24, 8, 2, 0, 0, time.UTC)
 
 	ExampleGraph = &adagio.GraphSpec{
 		Nodes: []*adagio.Node_Spec{
@@ -58,8 +61,14 @@ type UnsubscribeRepository interface {
 	UnsubscribeAll(chan<- *adagio.Event) error
 }
 
-func TestHarness(t *testing.T, repo Repository) {
+type Constructor func(func() time.Time) Repository
+
+func TestHarness(t *testing.T, repoFn Constructor) {
 	t.Helper()
+
+	repo := repoFn(func() time.Time {
+		return when
+	})
 
 	t.Run("a run is created", func(t *testing.T) {
 		run, err := repo.StartRun(ExampleGraph)
@@ -202,7 +211,8 @@ func (l *TestLayer) Exec(t *testing.T) {
 		select {
 		case event := <-events:
 			collected = append(collected, event)
-		default:
+		case <-time.After(5 * time.Second):
+			t.Fatal("timeout")
 		}
 	}
 
@@ -318,11 +328,16 @@ func ready(spec *adagio.Node_Spec) *adagio.Node {
 }
 
 func running(spec *adagio.Node_Spec) *adagio.Node {
-	return node(spec, adagio.Node_RUNNING)
+	n := node(spec, adagio.Node_RUNNING)
+	n.StartedAt = when.Format(time.RFC3339)
+	return n
 }
 
 func completed(spec *adagio.Node_Spec) *adagio.Node {
-	return node(spec, adagio.Node_COMPLETED)
+	n := node(spec, adagio.Node_COMPLETED)
+	n.StartedAt = when.Format(time.RFC3339)
+	n.FinishedAt = when.Format(time.RFC3339)
+	return n
 }
 
 func node(spec *adagio.Node_Spec, state adagio.Node_State) *adagio.Node {

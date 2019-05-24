@@ -2,6 +2,7 @@ package memory
 
 import (
 	"sync"
+	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
 	"github.com/georgemac/adagio/pkg/graph"
@@ -29,8 +30,9 @@ type Repository struct {
 	runs map[string]runState
 
 	listeners listenerSet
+	mu        sync.Mutex
 
-	mu sync.Mutex
+	now func() time.Time
 }
 
 func New() *Repository {
@@ -103,6 +105,7 @@ func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
 	}
 
 	node.State = adagio.Node_RUNNING
+	node.StartedAt = r.now().Format(time.RFC3339)
 
 	r.notifyListeners(state.run, node, adagio.Node_READY, adagio.Node_RUNNING)
 
@@ -134,6 +137,7 @@ func (r *Repository) FinishNode(runID, name string) error {
 	}
 
 	node.State = adagio.Node_COMPLETED
+	node.FinishedAt = r.now().Format(time.RFC3339)
 
 	r.notifyListeners(state.run, node, adagio.Node_RUNNING, adagio.Node_COMPLETED)
 
