@@ -30,6 +30,7 @@ func New(kv clientv3.KV, watcher clientv3.Watcher) *Repository {
 		watcher:       watcher,
 		mu:            sync.Mutex{},
 		subscriptions: map[chan<- *adagio.Event]chan struct{}{},
+		now:           func() time.Time { return time.Now().UTC() },
 	}
 }
 
