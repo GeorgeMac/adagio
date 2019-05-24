@@ -12,8 +12,8 @@ import (
 var ErrRuntimeDoesNotExist = errors.New("runtime does not exist")
 
 type Repository interface {
-	ClaimNode(run *adagio.Run, name string) (*adagio.Node, bool, error)
-	FinishNode(run *adagio.Run, name string) error
+	ClaimNode(runID, name string) (*adagio.Node, bool, error)
+	FinishNode(runID, name string) error
 	Subscribe(events chan<- *adagio.Event, states ...adagio.Node_State) error
 }
 
@@ -54,32 +54,10 @@ func (p *Pool) Run(ctxt context.Context) {
 			for {
 				select {
 				case event := <-events:
-					node, claimed, err := p.repo.ClaimNode(event.Run, event.Node.Spec.Name)
-					if err != nil {
-						log.Println(err)
-						continue
-					}
-
-					if !claimed {
-						log.Println("node already claimed")
-						continue
-					}
-
-					runtime, ok := p.runtimes[event.Node.Spec.Runtime]
-					if !ok {
-						log.Println(ErrRuntimeDoesNotExist)
-						continue
-					}
-
-					if err := runtime.Run(node); err != nil {
-						log.Println(err)
-						// TODO implement retry behavior
-						continue
-					}
-
-					if err := p.repo.FinishNode(event.Run, event.Node.Spec.Name); err != nil {
+					if err := p.handleEvent(event); err != nil {
 						log.Println(err)
 					}
+
 				case <-ctxt.Done():
 					return
 				}
@@ -88,4 +66,31 @@ func (p *Pool) Run(ctxt context.Context) {
 	}
 
 	wg.Wait()
+}
+
+func (p *Pool) handleEvent(event *adagio.Event) error {
+	node, claimed, err := p.repo.ClaimNode(event.RunID, event.NodeName)
+	if err != nil {
+		return err
+	}
+
+	if !claimed {
+		return errors.New("node already claimed")
+	}
+
+	runtime, ok := p.runtimes[node.Spec.Runtime]
+	if !ok {
+		return ErrRuntimeDoesNotExist
+	}
+
+	if err := runtime.Run(node); err != nil {
+		// TODO implement retry behavior
+		return err
+	}
+
+	if err := p.repo.FinishNode(event.RunID, event.NodeName); err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -31,6 +31,16 @@ func NewRun(spec *GraphSpec) (run *Run, err error) {
 	return
 }
 
+func (run *Run) GetNodeByName(name string) (*Node, error) {
+	for _, node := range run.Nodes {
+		if node.Spec.Name == name {
+			return node, nil
+		}
+	}
+
+	return nil, errors.New("graph: node not found")
+}
+
 func buildNodes(specs []*Node_Spec) (nodes []*Node) {
 	for _, spec := range specs {
 		nodes = append(nodes, &Node{

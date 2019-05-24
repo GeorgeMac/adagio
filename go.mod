@@ -10,7 +10,7 @@ require (
 	github.com/fatih/gomodifytags v0.0.0-20180914191908-141225bf62b6 // indirect
 	github.com/fatih/motion v0.0.0-20180408211639-218875ebe238 // indirect
 	github.com/go-delve/delve v1.2.0 // indirect
-	github.com/gogo/protobuf v1.2.1
+	github.com/gogo/protobuf v1.2.1 // indirect
 	github.com/golang/protobuf v1.3.1
 	github.com/google/shlex v0.0.0-20181106134648-c34317bd91bf // indirect
 	github.com/josharian/impl v0.0.0-20180228163738-3d0f908298c4 // indirect
@@ -38,7 +38,7 @@ require (
 	github.com/spf13/pflag v1.0.3 // indirect
 	github.com/stamblerre/gocode v0.0.0-20190213022308-8cc90faaf476 // indirect
 	github.com/stretchr/testify v1.3.0
-	github.com/twitchtv/twirp v5.6.0+incompatible
+	github.com/twitchtv/twirp v5.7.0+incompatible
 	github.com/zmb3/gogetdoc v0.0.0-20190228002656-b37376c5da6a // indirect
 	go.etcd.io/etcd v3.3.13+incompatible
 	golang.org/x/arch v0.0.0-20190312162104-788fe5ffcd8c // indirect

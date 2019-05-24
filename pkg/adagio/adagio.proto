@@ -12,10 +12,13 @@ message Run {
 }
 
 message Event {
-  Run run = 1;
-  Node node = 2;
-  Node.State from = 3;
-  Node.State to = 4;
+  enum Type {
+    STATE_TRANSITION = 0;
+  }
+
+  Type   type     = 1;
+  string runID    = 2;
+  string nodeName = 3;
 }
 
 message GraphSpec {

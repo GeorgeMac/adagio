@@ -79,11 +79,11 @@ func (r *Repository) ListRuns() (runs []*adagio.Run, err error) {
 	return
 }
 
-func (r *Repository) ClaimNode(run *adagio.Run, name string) (*adagio.Node, bool, error) {
+func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	state, err := r.state(run.Id)
+	state, err := r.state(runID)
 	if err != nil {
 		return nil, false, err
 	}
@@ -104,27 +104,26 @@ func (r *Repository) ClaimNode(run *adagio.Run, name string) (*adagio.Node, bool
 
 	node.State = adagio.Node_RUNNING
 
-	r.notifyListeners(run, node, adagio.Node_READY, adagio.Node_RUNNING)
+	r.notifyListeners(state.run, node, adagio.Node_READY, adagio.Node_RUNNING)
 
 	return node, true, nil
 }
 
 func (r *Repository) notifyListeners(run *adagio.Run, node *adagio.Node, from, to adagio.Node_State) {
-	nodeCopy := *node
 	for _, ch := range r.listeners[to] {
 		select {
-		case ch <- &adagio.Event{Run: run, Node: &nodeCopy, From: from, To: to}:
+		case ch <- &adagio.Event{RunID: run.Id, NodeName: node.Spec.Name, Type: adagio.Event_STATE_TRANSITION}:
 			// attempt to send
 		default:
 		}
 	}
 }
 
-func (r *Repository) FinishNode(run *adagio.Run, name string) error {
+func (r *Repository) FinishNode(runID, name string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	state, err := r.state(run.Id)
+	state, err := r.state(runID)
 	if err != nil {
 		return err
 	}
@@ -136,7 +135,7 @@ func (r *Repository) FinishNode(run *adagio.Run, name string) error {
 
 	node.State = adagio.Node_COMPLETED
 
-	r.notifyListeners(run, node, adagio.Node_RUNNING, adagio.Node_COMPLETED)
+	r.notifyListeners(state.run, node, adagio.Node_RUNNING, adagio.Node_COMPLETED)
 
 	outgoing, err := state.graph.Outgoing(node)
 	if err != nil {
@@ -160,7 +159,7 @@ func (r *Repository) FinishNode(run *adagio.Run, name string) error {
 		if ready {
 			out.State = adagio.Node_READY
 
-			r.notifyListeners(run, out, adagio.Node_WAITING, adagio.Node_READY)
+			r.notifyListeners(state.run, out, adagio.Node_WAITING, adagio.Node_READY)
 		}
 	}
 

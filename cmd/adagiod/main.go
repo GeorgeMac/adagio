@@ -47,7 +47,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		repo = etcd.New(cli.KV)
+		repo = etcd.New(cli.KV, cli.Watcher)
 	default:
 		fmt.Printf("unexpected repository type %q expected one of [memory|etcd]\n", *repository)
 		os.Exit(1)
@@ -82,7 +82,6 @@ func main() {
 	}
 
 	if runAgent {
-		fmt.Println("but why")
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
