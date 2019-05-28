@@ -11,31 +11,34 @@ import (
 
 var entropy = ulid.Monotonic(rand.New(rand.NewSource(time.Now().UnixNano())), 0)
 
-func NewRun(spec *GraphSpec) (*Run, error) {
+func NewRun(spec *GraphSpec) (run *Run, err error) {
 	now := time.Now().UTC()
-
-	run := &Run{
+	run = &Run{
 		Id:        ulid.MustNew(ulid.Timestamp(now), entropy).String(),
 		CreatedAt: now.Format(time.RFC3339),
 		Edges:     spec.Edges,
 		Nodes:     buildNodes(spec.Nodes),
 	}
 
-	if err := validateGraph(run); err != nil {
-		return nil, err
-	}
-
-	return run, nil
-}
-
-func validateGraph(run *Run) error {
 	graph := GraphFrom(run)
 
-	if len(graph.Cycles()) > 0 {
-		return errors.New("cannot contain cycles")
+	if err = validateGraph(graph); err != nil {
+		return
 	}
 
-	return nil
+	err = setInitialNodeStates(graph, run.Nodes)
+
+	return
+}
+
+func (run *Run) GetNodeByName(name string) (*Node, error) {
+	for _, node := range run.Nodes {
+		if node.Spec.Name == name {
+			return node, nil
+		}
+	}
+
+	return nil, errors.New("graph: node not found")
 }
 
 func buildNodes(specs []*Node_Spec) (nodes []*Node) {
@@ -46,6 +49,29 @@ func buildNodes(specs []*Node_Spec) (nodes []*Node) {
 	}
 
 	return
+}
+
+func validateGraph(graph *graph.Graph) error {
+	if len(graph.Cycles()) > 0 {
+		return errors.New("cannot contain cycles")
+	}
+
+	return nil
+}
+
+func setInitialNodeStates(graph *graph.Graph, nodes []*Node) error {
+	for _, node := range nodes {
+		incoming, err := graph.Incoming(node)
+		if err != nil {
+			return err
+		}
+
+		if len(incoming) == 0 {
+			node.State = Node_READY
+		}
+	}
+
+	return nil
 }
 
 func GraphFrom(run *Run) *graph.Graph {

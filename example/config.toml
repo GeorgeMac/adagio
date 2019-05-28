@@ -1,0 +1,2 @@
+backend-type = "etcd"
+etcd-addresses = "http://127.0.0.1:2379"

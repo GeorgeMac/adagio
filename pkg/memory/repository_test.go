@@ -2,6 +2,7 @@ package memory
 
 import (
 	"testing"
+	"time"
 
 	"github.com/georgemac/adagio/pkg/repository"
 )
@@ -9,5 +10,8 @@ import (
 func Test_Run_RepositoryTestHarness(t *testing.T) {
 	repo := New()
 
-	repository.TestHarness(t, repo)
+	repository.TestHarness(t, func(now func() time.Time) repository.Repository {
+		repo.now = now
+		return repo
+	})
 }

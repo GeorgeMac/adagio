@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
 	"github.com/georgemac/adagio/pkg/service/controlplane"
@@ -24,6 +25,8 @@ var (
 	e = &adagio.Node_Spec{Name: "e"}
 	f = &adagio.Node_Spec{Name: "f"}
 	g = &adagio.Node_Spec{Name: "g"}
+
+	when = time.Date(2019, 5, 24, 8, 2, 0, 0, time.UTC)
 
 	ExampleGraph = &adagio.GraphSpec{
 		Nodes: []*adagio.Node_Spec{
@@ -58,8 +61,14 @@ type UnsubscribeRepository interface {
 	UnsubscribeAll(chan<- *adagio.Event) error
 }
 
-func TestHarness(t *testing.T, repo Repository) {
+type Constructor func(func() time.Time) Repository
+
+func TestHarness(t *testing.T, repoFn Constructor) {
 	t.Helper()
+
+	repo := repoFn(func() time.Time {
+		return when
+	})
 
 	t.Run("a run is created", func(t *testing.T) {
 		run, err := repo.StartRun(ExampleGraph)
@@ -89,13 +98,13 @@ func TestHarness(t *testing.T, repo Repository) {
 				Unclaimable: []string{"c", "d", "e", "f", "g"},
 				Claimable:   map[string]*adagio.Node{"a": running(a), "b": running(b)},
 				Events: []*adagio.Event{
-					{Node: running(a), From: adagio.Node_READY, To: adagio.Node_RUNNING},
-					{Node: completed(a), From: adagio.Node_RUNNING, To: adagio.Node_COMPLETED},
-					{Node: running(b), From: adagio.Node_READY, To: adagio.Node_RUNNING},
-					{Node: completed(b), From: adagio.Node_RUNNING, To: adagio.Node_COMPLETED},
-					{Node: ready(c), From: adagio.Node_WAITING, To: adagio.Node_READY},
-					{Node: ready(d), From: adagio.Node_WAITING, To: adagio.Node_READY},
-					{Node: ready(f), From: adagio.Node_WAITING, To: adagio.Node_READY},
+					{RunID: run.Id, NodeName: "a", Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeName: "a", Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeName: "b", Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeName: "b", Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeName: "c", Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeName: "d", Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeName: "f", Type: adagio.Event_STATE_TRANSITION},
 				},
 			},
 			{
@@ -112,13 +121,13 @@ func TestHarness(t *testing.T, repo Repository) {
 				Unclaimable: []string{"e", "g"},
 				Claimable:   map[string]*adagio.Node{"c": running(c), "d": running(d), "f": running(f)},
 				Events: []*adagio.Event{
-					{Node: running(c), From: adagio.Node_READY, To: adagio.Node_RUNNING},
-					{Node: completed(c), From: adagio.Node_RUNNING, To: adagio.Node_COMPLETED},
-					{Node: running(d), From: adagio.Node_READY, To: adagio.Node_RUNNING},
-					{Node: completed(d), From: adagio.Node_RUNNING, To: adagio.Node_COMPLETED},
-					{Node: ready(e), From: adagio.Node_WAITING, To: adagio.Node_READY},
-					{Node: running(f), From: adagio.Node_READY, To: adagio.Node_RUNNING},
-					{Node: completed(f), From: adagio.Node_RUNNING, To: adagio.Node_COMPLETED},
+					{RunID: run.Id, NodeName: "c", Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeName: "c", Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeName: "d", Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeName: "d", Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeName: "e", Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeName: "f", Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeName: "f", Type: adagio.Event_STATE_TRANSITION},
 				},
 			},
 			{
@@ -135,9 +144,9 @@ func TestHarness(t *testing.T, repo Repository) {
 				Unclaimable: []string{"g"},
 				Claimable:   map[string]*adagio.Node{"e": running(e)},
 				Events: []*adagio.Event{
-					{Node: running(e), From: adagio.Node_READY, To: adagio.Node_RUNNING},
-					{Node: completed(e), From: adagio.Node_RUNNING, To: adagio.Node_COMPLETED},
-					{Node: ready(g), From: adagio.Node_WAITING, To: adagio.Node_READY},
+					{RunID: run.Id, NodeName: "e", Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeName: "e", Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeName: "g", Type: adagio.Event_STATE_TRANSITION},
 				},
 			},
 			{
@@ -153,8 +162,8 @@ func TestHarness(t *testing.T, repo Repository) {
 				Run:        run,
 				Claimable:  map[string]*adagio.Node{"g": running(g)},
 				Events: []*adagio.Event{
-					{Node: running(g), From: adagio.Node_READY, To: adagio.Node_RUNNING},
-					{Node: completed(g), From: adagio.Node_RUNNING, To: adagio.Node_COMPLETED},
+					{RunID: run.Id, NodeName: "g", Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeName: "g", Type: adagio.Event_STATE_TRANSITION},
 				},
 			},
 		} {
@@ -201,14 +210,14 @@ func (l *TestLayer) Exec(t *testing.T) {
 	for i := 0; i < len(l.Events); i++ {
 		select {
 		case event := <-events:
-			event.Run = nil
 			collected = append(collected, event)
-		default:
+		case <-time.After(5 * time.Second):
+			t.Fatal("timeout")
 		}
 	}
 
 	sort.SliceStable(collected, func(i, j int) bool {
-		return collected[i].Node.Spec.Name < collected[j].Node.Spec.Name
+		return collected[i].NodeName < collected[j].NodeName
 	})
 
 	if l.Events != nil {
@@ -229,7 +238,7 @@ func canNotClaim(t *testing.T, repo Repository, run *adagio.Run, names ...string
 				func(name string) {
 					t.Parallel()
 
-					_, _, err := repo.ClaimNode(run, name)
+					_, _, err := repo.ClaimNode(run.Id, name)
 					assert.Equal(t, adagio.ErrNodeNotReady, errors.Cause(err))
 				}(name)
 			})
@@ -268,7 +277,7 @@ func canFinish(t *testing.T, repo Repository, run *adagio.Run, names map[string]
 				func(name string) {
 					t.Parallel()
 
-					assert.Nil(t, repo.FinishNode(run, name))
+					assert.Nil(t, repo.FinishNode(run.Id, name))
 				}(name)
 			})
 		}
@@ -289,7 +298,7 @@ func attemptNClaims(t *testing.T, repo Repository, run *adagio.Run, name string,
 			go func() {
 				defer wg.Done()
 
-				cnode, ok, err := repo.ClaimNode(run, name)
+				cnode, ok, err := repo.ClaimNode(run.Id, name)
 				require.Nil(t, err)
 
 				if ok {
@@ -319,11 +328,16 @@ func ready(spec *adagio.Node_Spec) *adagio.Node {
 }
 
 func running(spec *adagio.Node_Spec) *adagio.Node {
-	return node(spec, adagio.Node_RUNNING)
+	n := node(spec, adagio.Node_RUNNING)
+	n.StartedAt = when.Format(time.RFC3339)
+	return n
 }
 
 func completed(spec *adagio.Node_Spec) *adagio.Node {
-	return node(spec, adagio.Node_COMPLETED)
+	n := node(spec, adagio.Node_COMPLETED)
+	n.StartedAt = when.Format(time.RFC3339)
+	n.FinishedAt = when.Format(time.RFC3339)
+	return n
 }
 
 func node(spec *adagio.Node_Spec, state adagio.Node_State) *adagio.Node {
