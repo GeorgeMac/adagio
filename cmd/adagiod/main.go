@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
 	"github.com/georgemac/adagio/pkg/etcd"
@@ -18,6 +19,8 @@ import (
 	"github.com/georgemac/adagio/pkg/rpc/controlplane"
 	controlservice "github.com/georgemac/adagio/pkg/service/controlplane"
 	"github.com/georgemac/adagio/pkg/worker"
+	"github.com/peterbourgon/ff"
+	"github.com/peterbourgon/ff/fftoml"
 	"go.etcd.io/etcd/clientv3"
 )
 
@@ -28,28 +31,39 @@ type Repository interface {
 
 func main() {
 	var (
-		repository       = flag.String("repo", "memory", "repository type [memory|etcd]")
-		addrs            = flag.String("etcd-addresses", "http://127.0.0.1:2379", "list of etcd node addresses")
-		repo             Repository
+		fs        = flag.NewFlagSet("adagiod", flag.ExitOnError)
+		backend   = fs.String("backend-type", "memory", "backend repository type [memory|etcd]")
+		etcdAddrs = fs.String("etcd-addresses", "http://127.0.0.1:2379", "list of etcd node addresses")
+		_         = fs.String("config", "", "location of config toml file")
+
 		ctxt, cancel     = context.WithCancel(context.Background())
-		wg               sync.WaitGroup
 		runAPI, runAgent = true, true
+
+		repo Repository
+		wg   sync.WaitGroup
 	)
 
-	flag.Parse()
+	ff.Parse(fs, os.Args[1:],
+		ff.WithConfigFileFlag("config"),
+		ff.WithConfigFileParser(fftoml.Parser),
+		ff.WithEnvVarPrefix("ADAGIOD"))
 
-	switch *repository {
+	switch *backend {
 	case "memory":
 		repo = memory.New()
 	case "etcd":
-		cli, err := clientv3.New(clientv3.Config{Endpoints: strings.Split(*addrs, ",")})
+		endpoints := strings.Split(*etcdAddrs, ",")
+		cli, err := clientv3.New(clientv3.Config{
+			Endpoints:   endpoints,
+			DialTimeout: 3 * time.Second,
+		})
 		if err != nil {
 			log.Fatal(err)
 		}
 
 		repo = etcd.New(cli.KV, cli.Watcher)
 	default:
-		fmt.Printf("unexpected repository type %q expected one of [memory|etcd]\n", *repository)
+		fmt.Printf("unexpected backend repository type %q expected one of [memory|etcd]\n", *backend)
 		os.Exit(1)
 	}
 
@@ -86,6 +100,8 @@ func main() {
 		go func() {
 			defer wg.Done()
 
+			log.Printf("Agent accepting work from %q backend\n", *backend)
+
 			agent(ctxt, repo)
 		}()
 	}
@@ -97,11 +113,14 @@ func api(ctxt context.Context, repo controlservice.Repository) {
 	var (
 		service = controlservice.New(repo)
 		mux     = controlplane.NewControlPlaneServer(service, nil)
+		addr    = ":7890"
 		server  = &http.Server{
-			Addr:    ":7890",
+			Addr:    addr,
 			Handler: mux,
 		}
 	)
+
+	log.Printf("Control plane listening on %q\n", addr)
 
 	go func() {
 		<-ctxt.Done()

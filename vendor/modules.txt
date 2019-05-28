@@ -1,3 +1,5 @@
+# github.com/BurntSushi/toml v0.3.1
+github.com/BurntSushi/toml
 # github.com/coreos/etcd v3.3.13+incompatible
 github.com/coreos/etcd/auth/authpb
 github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes
@@ -24,6 +26,9 @@ github.com/kr/pretty
 github.com/kr/text
 # github.com/oklog/ulid v1.3.1
 github.com/oklog/ulid
+# github.com/peterbourgon/ff v1.2.0
+github.com/peterbourgon/ff
+github.com/peterbourgon/ff/fftoml
 # github.com/pkg/errors v0.8.1
 github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
