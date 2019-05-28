@@ -32,7 +32,7 @@ type Repository interface {
 func main() {
 	var (
 		fs        = flag.NewFlagSet("adagiod", flag.ExitOnError)
-		backend   = fs.String("backend-type", "memory", "backend repository type [memory|etcd]")
+		backend   = fs.String("backend-type", "memory", `backend repository type ("memory"|"etcd")`)
 		etcdAddrs = fs.String("etcd-addresses", "http://127.0.0.1:2379", "list of etcd node addresses")
 		_         = fs.String("config", "", "location of config toml file")
 
@@ -42,6 +42,14 @@ func main() {
 		repo Repository
 		wg   sync.WaitGroup
 	)
+
+	fs.Usage = func() {
+		fmt.Println()
+		fmt.Println("Usage: adagiod <api|agent> [OPTIONS]\n")
+		fmt.Println("The adagio workflow agent and control plane API\n")
+		fmt.Println("Options:")
+		fs.PrintDefaults()
+	}
 
 	ff.Parse(fs, os.Args[1:],
 		ff.WithConfigFileFlag("config"),
@@ -77,8 +85,8 @@ func main() {
 		cancel()
 	}()
 
-	if len(flag.Args()) > 0 {
-		switch flag.Arg(0) {
+	if len(fs.Args()) > 0 {
+		switch fs.Arg(0) {
 		case "agent":
 			runAPI = false
 		case "api":
