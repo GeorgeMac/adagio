@@ -21,17 +21,23 @@ type Repository struct {
 	mu            sync.Mutex
 	subscriptions map[chan<- *adagio.Event]chan struct{}
 
+	ns  namespace
 	now func() time.Time
 }
 
-func New(kv clientv3.KV, watcher clientv3.Watcher) *Repository {
-	return &Repository{
+func New(kv clientv3.KV, watcher clientv3.Watcher, opts ...Option) *Repository {
+	r := &Repository{
 		kv:            kv,
 		watcher:       watcher,
 		mu:            sync.Mutex{},
 		subscriptions: map[chan<- *adagio.Event]chan struct{}{},
 		now:           func() time.Time { return time.Now().UTC() },
+		ns:            namespace("v0/"),
 	}
+
+	Options(opts).Apply(r)
+
+	return r
 }
 
 func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err error) {
@@ -46,7 +52,7 @@ func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err erro
 	}
 
 	var (
-		runKey = runKey(run)
+		runKey = r.ns.runKey(run)
 		cmps   = []clientv3.Cmp{
 			clientv3.Compare(clientv3.Version(runKey), "=", 0),
 		}
@@ -67,7 +73,7 @@ func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err erro
 		}
 
 		var (
-			key = nodeInStateKey(run.Id, node.Spec.Name, state)
+			key = r.ns.nodeInStateKey(run.Id, state, node.Spec.Name)
 			put = clientv3.OpPut(key, string(nodeData))
 		)
 
@@ -89,23 +95,15 @@ func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err erro
 	return
 }
 
-func runKey(run *adagio.Run) string {
-	return fmt.Sprintf("runs/%s", run.Id)
-}
-
-func nodeInStateKey(runID, name, state string) string {
-	return fmt.Sprintf("states/%s/run/%s/node/%s", state, runID, name)
-}
-
 func (r *Repository) ListRuns() (runs []*adagio.Run, err error) {
 	ctxt := context.Background()
-	resp, err := r.kv.Get(ctxt, "runs/", clientv3.WithPrefix())
+	resp, err := r.kv.Get(ctxt, r.ns.runs(), clientv3.WithPrefix())
 	if err != nil {
 		return nil, err
 	}
 
 	for _, kv := range resp.Kvs {
-		parts := strings.SplitN(string(kv.Key), "/", 2)
+		parts := strings.SplitN(r.ns.stripBytes(kv.Key), "/", 2)
 		if len(parts) < 2 {
 			continue
 		}
@@ -169,8 +167,8 @@ func (r *Repository) transition(ctxt context.Context, runID string, node *adagio
 	}
 
 	var (
-		fromKey = nodeInStateKey(runID, node.Spec.Name, from)
-		toKey   = nodeInStateKey(runID, node.Spec.Name, to)
+		fromKey = r.ns.nodeInStateKey(runID, from, node.Spec.Name)
+		toKey   = r.ns.nodeInStateKey(runID, to, node.Spec.Name)
 	)
 
 	node.State = toState
@@ -248,7 +246,7 @@ func (r *Repository) FinishNode(runID, name string) error {
 				return err
 			}
 
-			currentKey := nodeInStateKey(runID, in.Spec.Name, state)
+			currentKey := r.ns.nodeInStateKey(runID, state, in.Spec.Name)
 			cmps = append(cmps, clientv3.Compare(clientv3.Version(currentKey), ">", 0))
 		}
 
@@ -289,7 +287,7 @@ func (r *Repository) Subscribe(events chan<- *adagio.Event, s ...adagio.Node_Sta
 	r.subscriptions[events] = ch
 
 	go func() {
-		watch := r.watcher.Watch(context.Background(), "states/", clientv3.WithPrefix())
+		watch := r.watcher.Watch(context.Background(), r.ns.states(), clientv3.WithPrefix())
 		for {
 			var resp clientv3.WatchResponse
 			select {
@@ -306,7 +304,7 @@ func (r *Repository) Subscribe(events chan<- *adagio.Event, s ...adagio.Node_Sta
 			if len(resp.Events) > 0 {
 				for _, ev := range resp.Events {
 					if ev.IsCreate() {
-						keyParts := strings.Split(string(ev.Kv.Key), "/")
+						keyParts := strings.Split(r.ns.stripBytes(ev.Kv.Key), "/")
 						if len(keyParts) < 6 {
 							continue
 						}
@@ -338,7 +336,7 @@ func (r *Repository) getRun(ctxt context.Context, id string) (*adagio.Run, error
 		Id: id,
 	}
 
-	resp, err := r.kv.Get(ctxt, fmt.Sprintf("runs/%s", id))
+	resp, err := r.kv.Get(ctxt, r.ns.runKey(&adagio.Run{Id: id}))
 	if err != nil {
 		return nil, err
 	}
@@ -377,7 +375,7 @@ func (r *Repository) getNode(ctxt context.Context, key string) (*adagio.Node, er
 func (r *Repository) nodesForRun(ctxt context.Context, id string) (nodes []*adagio.Node, err error) {
 	for _, state := range []string{"waiting", "ready", "running", "completed"} {
 		var (
-			prefix    = fmt.Sprintf("states/%s/run/%s", state, id)
+			prefix    = r.ns.nodesInStateKey(id, state)
 			resp, err = r.kv.Get(ctxt, prefix, clientv3.WithPrefix())
 		)
 
@@ -409,6 +407,32 @@ func (r *Repository) UnsubscribeAll(ch chan<- *adagio.Event) error {
 	}
 
 	return nil
+}
+
+type namespace string
+
+func (n namespace) runs() string {
+	return string(n) + "runs/"
+}
+
+func (n namespace) states() string {
+	return string(n) + "states/"
+}
+
+func (n namespace) runKey(run *adagio.Run) string {
+	return fmt.Sprintf("%sruns/%s", n, run.Id)
+}
+
+func (n namespace) nodesInStateKey(runID, state string) string {
+	return fmt.Sprintf("%sstates/%s/run/%s", n, state, runID)
+}
+
+func (n namespace) nodeInStateKey(runID, state, name string) string {
+	return fmt.Sprintf("%sstates/%s/run/%s/node/%s", n, state, runID, name)
+}
+
+func (n namespace) stripBytes(key []byte) string {
+	return strings.TrimPrefix(string(key), string(n))
 }
 
 type run struct {

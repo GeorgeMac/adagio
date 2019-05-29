@@ -21,7 +21,7 @@ func runs(ctxt context.Context, client controlplane.ControlPlane, args []string)
 
 	fs.Usage = func() {
 		fmt.Println()
-		fmt.Println("Usage: adagio runs <COMMAND> [OPTIONS]\n")
+		fmt.Print("Usage: adagio runs <COMMAND> [OPTIONS]\n\n")
 		fmt.Println("Commands:")
 		fmt.Println("\tstart - starts a new run from the provided graph spec")
 		fmt.Println("\tls    - list current and previous runs")
@@ -55,7 +55,7 @@ func start(ctxt context.Context, client controlplane.ControlPlane, args []string
 
 	fs.Usage = func() {
 		fmt.Println()
-		fmt.Println("Usage: adagio runs start [OPTIONS]\n")
+		fmt.Print("Usage: adagio runs start [OPTIONS]\n\n")
 		fmt.Println("Options:")
 		fs.PrintDefaults()
 	}

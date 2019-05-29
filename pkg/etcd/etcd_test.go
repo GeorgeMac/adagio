@@ -1,6 +1,9 @@
+// +build etcd
+
 package etcd
 
 import (
+	"context"
 	"log"
 	"testing"
 	"time"
@@ -15,7 +18,14 @@ func Test_Run_RepositoryTestHarness(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	repo := New(cli.KV, cli.Watcher)
+	defer func() {
+		_, err := cli.KV.Delete(context.Background(), "adagio-test/", clientv3.WithPrefix())
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	repo := New(cli.KV, cli.Watcher, WithNamespace("adagio-test/"))
 
 	repository.TestHarness(t, func(now func() time.Time) repository.Repository {
 		repo.now = now

@@ -45,8 +45,8 @@ func main() {
 
 	fs.Usage = func() {
 		fmt.Println()
-		fmt.Println("Usage: adagiod <api|agent> [OPTIONS]\n")
-		fmt.Println("The adagio workflow agent and control plane API\n")
+		fmt.Print("Usage: adagiod <api|agent> [OPTIONS]\n\n")
+		fmt.Print("The adagio workflow agent and control plane API\n\n")
 		fmt.Println("Options:")
 		fs.PrintDefaults()
 	}

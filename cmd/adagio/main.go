@@ -19,7 +19,7 @@ func main() {
 
 	fs.Usage = func() {
 		fmt.Println()
-		fmt.Println("Usage: adagio <COMMAND> [OPTIONS]\n")
+		fmt.Print("Usage: adagio <COMMAND> [OPTIONS]\n\n")
 		fmt.Println("Commands:")
 		fmt.Println("\truns - manage adagio runs")
 		fmt.Println("Options:")
