@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"sync"
 
@@ -18,12 +19,12 @@ type Repository interface {
 }
 
 type Runtime interface {
-	Run(*adagio.Node) error
+	Run(*adagio.Node) (*adagio.Result, error)
 }
 
-type RuntimeFunc func(*adagio.Node) error
+type RuntimeFunc func(*adagio.Node) (*adagio.Result, error)
 
-func (fn RuntimeFunc) Run(n *adagio.Node) error { return fn(n) }
+func (fn RuntimeFunc) Run(n *adagio.Node) (*adagio.Result, error) { return fn(n) }
 
 type Pool struct {
 	repo     Repository
@@ -83,10 +84,13 @@ func (p *Pool) handleEvent(event *adagio.Event) error {
 		return ErrRuntimeDoesNotExist
 	}
 
-	if err := runtime.Run(node); err != nil {
+	resp, err := runtime.Run(node)
+	if err != nil {
 		// TODO implement retry behavior
 		return err
 	}
+
+	fmt.Println(string(resp.Output))
 
 	if err := p.repo.FinishNode(event.RunID, event.NodeName); err != nil {
 		return err
