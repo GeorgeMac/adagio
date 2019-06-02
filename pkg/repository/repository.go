@@ -340,6 +340,6 @@ func completed(spec *adagio.Node_Spec) *adagio.Node {
 	return n
 }
 
-func node(spec *adagio.Node_Spec, state adagio.Node_State) *adagio.Node {
-	return &adagio.Node{Spec: spec, State: state}
+func node(spec *adagio.Node_Spec, status adagio.Node_Status) *adagio.Node {
+	return &adagio.Node{Spec: spec, Status: status}
 }

@@ -15,7 +15,7 @@ var ErrRuntimeDoesNotExist = errors.New("runtime does not exist")
 type Repository interface {
 	ClaimNode(runID, name string) (*adagio.Node, bool, error)
 	FinishNode(runID, name string) error
-	Subscribe(events chan<- *adagio.Event, states ...adagio.Node_State) error
+	Subscribe(events chan<- *adagio.Event, states ...adagio.Node_Status) error
 }
 
 type Runtime interface {

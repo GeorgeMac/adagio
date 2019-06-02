@@ -67,7 +67,7 @@ func setInitialNodeStates(graph *graph.Graph, nodes []*Node) error {
 		}
 
 		if len(incoming) == 0 {
-			node.State = Node_READY
+			node.Status = Node_READY
 		}
 	}
 
