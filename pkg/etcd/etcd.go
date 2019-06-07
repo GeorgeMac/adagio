@@ -11,7 +11,12 @@ import (
 	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
+	"github.com/georgemac/adagio/pkg/worker"
 	"go.etcd.io/etcd/clientv3"
+)
+
+var (
+	_ worker.Repository = (*Repository)(nil)
 )
 
 type Repository struct {
@@ -152,6 +157,29 @@ func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
 		return nil, false, nil
 	}
 
+	// for each incoming node fetch their outputs
+	incoming, err := adagio.GraphFrom(run).Incoming(node)
+	if err != nil {
+		return nil, false, err
+	}
+
+	for ini := range incoming {
+		in := ini.(*adagio.Node)
+
+		resp, err := r.kv.Get(ctxt, r.ns.output(runID, in.Spec.Name))
+		if err != nil {
+			return nil, false, err
+		}
+
+		if len(resp.Kvs) > 0 {
+			if node.Inputs == nil {
+				node.Inputs = map[string][]byte{}
+			}
+
+			node.Inputs[in.Spec.Name] = resp.Kvs[0].Value
+		}
+	}
+
 	return node, resp.Succeeded, nil
 }
 
@@ -194,7 +222,7 @@ func (r *Repository) transition(ctxt context.Context, runID string, node *adagio
 		}, nil
 }
 
-func (r *Repository) FinishNode(runID, name string) error {
+func (r *Repository) FinishNode(runID, name string, result *adagio.Result) error {
 	ctxt := context.Background()
 	run, err := r.getRun(ctxt, runID)
 	if err != nil {
@@ -216,6 +244,8 @@ func (r *Repository) FinishNode(runID, name string) error {
 	if err != nil {
 		return err
 	}
+
+	ops = append(ops, clientv3.OpPut(r.ns.output(run.Id, node.Spec.Name), string(result.Output)))
 
 	outgoing, err := graph.Outgoing(node)
 	if err != nil {
@@ -272,7 +302,7 @@ func (r *Repository) FinishNode(runID, name string) error {
 	}
 
 	if !resp.Succeeded {
-		return r.FinishNode(runID, name)
+		return r.FinishNode(runID, name, result)
 	}
 
 	return nil
@@ -429,6 +459,10 @@ func (n namespace) nodesInStateKey(runID, state string) string {
 
 func (n namespace) nodeInStateKey(runID, state, name string) string {
 	return fmt.Sprintf("%sstates/%s/run/%s/node/%s", n, state, runID, name)
+}
+
+func (n namespace) output(runID, node string) string {
+	return fmt.Sprintf("%sruns/%s/node/%s/output", n, runID, node)
 }
 
 func (n namespace) stripBytes(key []byte) string {
