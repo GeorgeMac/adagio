@@ -26,10 +26,15 @@ message GraphSpec {
   repeated Edge edges = 2;
 }
 
+message MetadataValue {
+  repeated string values = 1;
+}
+
 message Node {
   message Spec {
     string name = 1;
     string runtime = 2;
+    map<string, MetadataValue> metadata = 3;
   }
   
   enum State {
@@ -43,9 +48,15 @@ message Node {
   State state = 2;
   string started_at = 3;
   string finished_at = 4;
+  map<string, bytes> inputs = 5;
 }
 
 message Edge {
   string source = 1;
   string destination = 2;
+}
+
+message Result {
+  map<string, MetadataValue> metadata = 1;
+  bytes output = 2;
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/georgemac/adagio/pkg/etcd"
 	"github.com/georgemac/adagio/pkg/memory"
 	"github.com/georgemac/adagio/pkg/rpc/controlplane"
+	"github.com/georgemac/adagio/pkg/runtimes/exec"
 	controlservice "github.com/georgemac/adagio/pkg/service/controlplane"
 	"github.com/georgemac/adagio/pkg/worker"
 	"github.com/peterbourgon/ff"
@@ -144,10 +145,10 @@ func api(ctxt context.Context, repo controlservice.Repository) {
 func agent(ctxt context.Context, repo worker.Repository) {
 	var (
 		runtimes = map[string]worker.Runtime{
-			"echo": worker.RuntimeFunc(func(node *adagio.Node) error {
-				fmt.Printf("got node %s\n", node)
-				return nil
+			"echo": worker.RuntimeFunc(func(node *adagio.Node) (*adagio.Result, error) {
+				return &adagio.Result{Output: []byte(fmt.Sprintf("got node %s\n", node))}, nil
 			}),
+			"exec": exec.New(),
 		}
 	)
 
