@@ -153,6 +153,13 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Result) error
 			return errors.Wrapf(err, "finishing node %q", node)
 		}
 
+		// propagate outpust to inputs of next node
+		if out.Inputs == nil {
+			out.Inputs = map[string][]byte{}
+		}
+
+		out.Inputs[node.Spec.Name] = result.Output
+
 		// given all the incoming nodes into "out" are now completed
 		// then the waiting out node can be progressed to ready
 		ready := true
