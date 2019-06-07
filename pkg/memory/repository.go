@@ -122,7 +122,7 @@ func (r *Repository) notifyListeners(run *adagio.Run, node *adagio.Node, from, t
 	}
 }
 
-func (r *Repository) FinishNode(runID, name string) error {
+func (r *Repository) FinishNode(runID, name string, result *adagio.Result) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

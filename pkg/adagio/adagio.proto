@@ -30,6 +30,12 @@ message MetadataValue {
   repeated string values = 1;
 }
 
+enum Conclusion {
+  SUCCESS = 0;
+  FAIL = 1;
+  CANCEL = 2;
+}
+
 message Node {
   message Spec {
     string name = 1;
@@ -42,12 +48,6 @@ message Node {
     READY = 1;
     RUNNING = 2;
     COMPLETED = 3;
-  }
-
-  enum Conclusion {
-    SUCCESS = 0;
-    FAIL = 1;
-    ERROR = 2;
   }
 
   Spec spec = 1;
@@ -64,6 +64,7 @@ message Edge {
 }
 
 message Result {
-  map<string, MetadataValue> metadata = 1;
-  bytes output = 2;
+  Conclusion conclusion = 1;
+  map<string, MetadataValue> metadata = 2;
+  bytes output = 3;
 }
