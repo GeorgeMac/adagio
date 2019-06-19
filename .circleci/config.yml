@@ -14,7 +14,7 @@ jobs:
 
       - run: make docker-etcd
 
-      - run: make test-with-intergrations
+      - run: make test-with-integrations
 
       - save_cache:
           key: go-mod-v1-{{ checksum "go.sum" }}
