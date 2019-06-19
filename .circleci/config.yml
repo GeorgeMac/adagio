@@ -10,6 +10,8 @@ jobs:
           keys:
             - go-mod-v1-{{ checksum "go.sum" }}
 
+      - setup_remote_docker
+
       - run: make docker-etcd
 
       - run: make test-with-intergrations
