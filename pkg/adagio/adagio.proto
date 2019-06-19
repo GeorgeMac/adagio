@@ -30,6 +30,12 @@ message MetadataValue {
   repeated string values = 1;
 }
 
+enum Conclusion {
+  SUCCESS = 0;
+  FAIL = 1;
+  CANCEL = 2;
+}
+
 message Node {
   message Spec {
     string name = 1;
@@ -37,7 +43,7 @@ message Node {
     map<string, MetadataValue> metadata = 3;
   }
   
-  enum State {
+  enum Status {
     WAITING = 0;
     READY = 1;
     RUNNING = 2;
@@ -45,10 +51,11 @@ message Node {
   }
 
   Spec spec = 1;
-  State state = 2;
-  string started_at = 3;
-  string finished_at = 4;
-  map<string, bytes> inputs = 5;
+  Status status = 2;
+  Conclusion conclusion = 3;
+  string started_at = 4;
+  string finished_at = 5;
+  map<string, bytes> inputs = 6;
 }
 
 message Edge {
@@ -57,6 +64,7 @@ message Edge {
 }
 
 message Result {
-  map<string, MetadataValue> metadata = 1;
-  bytes output = 2;
+  Conclusion conclusion = 1;
+  map<string, MetadataValue> metadata = 2;
+  bytes output = 3;
 }

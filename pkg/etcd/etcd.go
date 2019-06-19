@@ -11,7 +11,12 @@ import (
 	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
+	"github.com/georgemac/adagio/pkg/worker"
 	"go.etcd.io/etcd/clientv3"
+)
+
+var (
+	_ worker.Repository = (*Repository)(nil)
 )
 
 type Repository struct {
@@ -67,7 +72,7 @@ func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err erro
 			return nil, err
 		}
 
-		state, err := stateToString(node.State)
+		state, err := stateToString(node.Status)
 		if err != nil {
 			return nil, err
 		}
@@ -131,7 +136,7 @@ func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
 		return nil, false, err
 	}
 
-	if node.State != adagio.Node_READY {
+	if node.Status != adagio.Node_READY {
 		return nil, false, adagio.ErrNodeNotReady
 	}
 
@@ -152,16 +157,39 @@ func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
 		return nil, false, nil
 	}
 
+	// for each incoming node fetch their outputs
+	incoming, err := adagio.GraphFrom(run).Incoming(node)
+	if err != nil {
+		return nil, false, err
+	}
+
+	for ini := range incoming {
+		in := ini.(*adagio.Node)
+
+		resp, err := r.kv.Get(ctxt, r.ns.output(runID, in.Spec.Name))
+		if err != nil {
+			return nil, false, err
+		}
+
+		if len(resp.Kvs) > 0 {
+			if node.Inputs == nil {
+				node.Inputs = map[string][]byte{}
+			}
+
+			node.Inputs[in.Spec.Name] = resp.Kvs[0].Value
+		}
+	}
+
 	return node, resp.Succeeded, nil
 }
 
-func (r *Repository) transition(ctxt context.Context, runID string, node *adagio.Node, toState adagio.Node_State) ([]clientv3.Cmp, []clientv3.Op, error) {
-	from, err := stateToString(node.State)
+func (r *Repository) transition(ctxt context.Context, runID string, node *adagio.Node, toStatus adagio.Node_Status) ([]clientv3.Cmp, []clientv3.Op, error) {
+	from, err := stateToString(node.Status)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	to, err := stateToString(toState)
+	to, err := stateToString(toStatus)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -171,9 +199,9 @@ func (r *Repository) transition(ctxt context.Context, runID string, node *adagio
 		toKey   = r.ns.nodeInStateKey(runID, to, node.Spec.Name)
 	)
 
-	node.State = toState
+	node.Status = toStatus
 
-	switch toState {
+	switch toStatus {
 	case adagio.Node_RUNNING:
 		node.StartedAt = r.now().Format(time.RFC3339)
 	case adagio.Node_COMPLETED:
@@ -194,7 +222,7 @@ func (r *Repository) transition(ctxt context.Context, runID string, node *adagio
 		}, nil
 }
 
-func (r *Repository) FinishNode(runID, name string) error {
+func (r *Repository) FinishNode(runID, name string, result *adagio.Result) error {
 	ctxt := context.Background()
 	run, err := r.getRun(ctxt, runID)
 	if err != nil {
@@ -206,7 +234,7 @@ func (r *Repository) FinishNode(runID, name string) error {
 		return err
 	}
 
-	if node.State != adagio.Node_RUNNING {
+	if node.Status != adagio.Node_RUNNING {
 		return errors.New("attempt to finish non-running node")
 	}
 
@@ -216,6 +244,8 @@ func (r *Repository) FinishNode(runID, name string) error {
 	if err != nil {
 		return err
 	}
+
+	ops = append(ops, clientv3.OpPut(r.ns.output(run.Id, node.Spec.Name), string(result.Output)))
 
 	outgoing, err := graph.Outgoing(node)
 	if err != nil {
@@ -235,13 +265,13 @@ func (r *Repository) FinishNode(runID, name string) error {
 		for v := range incoming {
 			in := v.(*adagio.Node)
 
-			isReady = isReady && in.State == adagio.Node_COMPLETED
+			isReady = isReady && in.Status == adagio.Node_COMPLETED
 
 			if in == node {
 				continue
 			}
 
-			state, err := stateToString(in.State)
+			state, err := stateToString(in.Status)
 			if err != nil {
 				return err
 			}
@@ -272,13 +302,13 @@ func (r *Repository) FinishNode(runID, name string) error {
 	}
 
 	if !resp.Succeeded {
-		return r.FinishNode(runID, name)
+		return r.FinishNode(runID, name, result)
 	}
 
 	return nil
 }
 
-func (r *Repository) Subscribe(events chan<- *adagio.Event, s ...adagio.Node_State) error {
+func (r *Repository) Subscribe(events chan<- *adagio.Event, s ...adagio.Node_Status) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -431,6 +461,10 @@ func (n namespace) nodeInStateKey(runID, state, name string) string {
 	return fmt.Sprintf("%sstates/%s/run/%s/node/%s", n, state, runID, name)
 }
 
+func (n namespace) output(runID, node string) string {
+	return fmt.Sprintf("%sruns/%s/node/%s/output", n, runID, node)
+}
+
 func (n namespace) stripBytes(key []byte) string {
 	return strings.TrimPrefix(string(key), string(n))
 }
@@ -464,9 +498,9 @@ func marshalRun(createdAt string, edges []*adagio.Edge) ([]byte, error) {
 	return json.Marshal(&run)
 }
 
-type states []adagio.Node_State
+type states []adagio.Node_Status
 
-func (s states) contains(state adagio.Node_State) bool {
+func (s states) contains(state adagio.Node_Status) bool {
 	for _, needle := range s {
 		if state == needle {
 			return true
@@ -476,7 +510,7 @@ func (s states) contains(state adagio.Node_State) bool {
 	return false
 }
 
-func stateFromString(state string) (adagio.Node_State, error) {
+func stateFromString(state string) (adagio.Node_Status, error) {
 	switch state {
 	case "waiting":
 		return adagio.Node_WAITING, nil
@@ -491,7 +525,7 @@ func stateFromString(state string) (adagio.Node_State, error) {
 	}
 }
 
-func stateToString(state adagio.Node_State) (string, error) {
+func stateToString(state adagio.Node_Status) (string, error) {
 	switch state {
 	case adagio.Node_WAITING:
 		return "waiting", nil

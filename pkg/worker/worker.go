@@ -3,7 +3,6 @@ package worker
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"sync"
 
@@ -14,8 +13,8 @@ var ErrRuntimeDoesNotExist = errors.New("runtime does not exist")
 
 type Repository interface {
 	ClaimNode(runID, name string) (*adagio.Node, bool, error)
-	FinishNode(runID, name string) error
-	Subscribe(events chan<- *adagio.Event, states ...adagio.Node_State) error
+	FinishNode(runID, name string, result *adagio.Result) error
+	Subscribe(events chan<- *adagio.Event, states ...adagio.Node_Status) error
 }
 
 type Runtime interface {
@@ -84,15 +83,13 @@ func (p *Pool) handleEvent(event *adagio.Event) error {
 		return ErrRuntimeDoesNotExist
 	}
 
-	resp, err := runtime.Run(node)
+	result, err := runtime.Run(node)
 	if err != nil {
 		// TODO implement retry behavior
 		return err
 	}
 
-	fmt.Println(string(resp.Output))
-
-	if err := p.repo.FinishNode(event.RunID, event.NodeName); err != nil {
+	if err := p.repo.FinishNode(event.RunID, event.NodeName, result); err != nil {
 		return err
 	}
 
