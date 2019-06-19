@@ -10,7 +10,9 @@ jobs:
           keys:
             - go-mod-v1-{{ checksum "go.sum" }}
 
-      - run: make test 
+      - run: make docker-etcd
+
+      - run: make test-with-intergrations
 
       - save_cache:
           key: go-mod-v1-{{ checksum "go.sum" }}
