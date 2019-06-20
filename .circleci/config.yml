@@ -6,15 +6,14 @@ jobs:
       - image: gcr.io/etcd-development/etcd:v3.3.13
         command:
           - /usr/local/bin/etcd
-          - -name=s1
-          - -data-dir=/etcd-data
-          - -listen-client-urls=http://0.0.0.0:2379
-          - -advertise-client-urls=http://0.0.0.0:2379
-          - -listen-peer-urls=http://0.0.0.0:2380
         environment:
+          - ETCD_NAME=s1
+          - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+          - ETCD_ADVERTISE_CLIENT_URLS=http://0.0.0.0:2379
+          - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
           - ETCD_INITIAL_CLUSTER="s1=http://0.0.0.0:2380"
-          - ETCD_INITIAL_TOKEN=tkn
-          - ETCD_INITIAL_STATE=new
+          - ETCD_INITIAL_CLUSTER_TOKEN=tkn
+          - ETCD_INITIAL_CLUSTER_STATE=new
 
     steps:
       - checkout
