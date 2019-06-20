@@ -19,10 +19,6 @@ protobuf: protobuf-deps ## Build protocol buffers into twirp model and service d
 	protoc --go_out=paths=source_relative:. ./pkg/adagio/adagio.proto
 	protoc -I. --twirp_out=. --go_out=. ./pkg/rpc/controlplane/service.proto
 
-.PHONY: docker-etcd
-docker-etcd:
-	@hack/docker-etcd
-
 protobuf-deps: ## Fetch protobuf dependencies
 	@go get github.com/twitchtv/twirp/protoc-gen-twirp
 	@go get github.com/golang/protobuf/protoc-gen-go
