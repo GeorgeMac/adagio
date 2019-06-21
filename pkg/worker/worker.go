@@ -32,12 +32,16 @@ type Pool struct {
 	size int
 }
 
-func NewPool(repo Repository, runtimes map[string]Runtime) *Pool {
-	return &Pool{
+func NewPool(repo Repository, runtimes map[string]Runtime, opts ...Option) *Pool {
+	pool := &Pool{
 		repo:     repo,
 		runtimes: runtimes,
-		size:     5,
+		size:     1,
 	}
+
+	Options(opts).Apply(pool)
+
+	return pool
 }
 
 func (p *Pool) Run(ctxt context.Context) {
