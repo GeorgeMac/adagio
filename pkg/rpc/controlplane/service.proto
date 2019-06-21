@@ -8,6 +8,7 @@ import "pkg/adagio/adagio.proto";
 
 service ControlPlane {
   rpc Start(StartRequest) returns (StartResponse);
+  rpc Inspect(InspectRequest) returns (InspectResponse);
   rpc List(ListRequest) returns (ListResponse);
 }
 
@@ -17,6 +18,14 @@ message StartRequest {
 
 message StartResponse {
   adagio.Run run = 1;
+}
+
+message InspectRequest {
+    string id = 1;
+}
+
+message InspectResponse {
+    adagio.Run run = 1;
 }
 
 message ListRequest {}

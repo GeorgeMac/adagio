@@ -10,6 +10,7 @@ import (
 
 type Repository interface {
 	StartRun(*adagio.GraphSpec) (*adagio.Run, error)
+	InspectRun(id string) (*adagio.Run, error)
 	ListRuns() ([]*adagio.Run, error)
 }
 
@@ -32,6 +33,15 @@ func (s *Service) Start(_ context.Context, req *controlplane.StartRequest) (*con
 	}
 
 	return &controlplane.StartResponse{Run: run}, nil
+}
+
+func (s *Service) Inspect(_ context.Context, req *controlplane.InspectRequest) (*controlplane.InspectResponse, error) {
+	run, err := s.repo.InspectRun(req.Id)
+	if err != nil {
+		return nil, errors.Wrap(err, "control plane: starting run")
+	}
+
+	return &controlplane.InspectResponse{Run: run}, nil
 }
 
 func (s *Service) List(_ context.Context, _ *controlplane.ListRequest) (*controlplane.ListResponse, error) {

@@ -70,6 +70,18 @@ func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err erro
 	return
 }
 
+func (r *Repository) InspectRun(id string) (*adagio.Run, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	state, err := r.state(id)
+	if err != nil {
+		return nil, err
+	}
+
+	return state.run, nil
+}
+
 func (r *Repository) ListRuns() (runs []*adagio.Run, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -175,10 +187,6 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Result) error
 	}
 
 	return nil
-}
-
-func (r *Repository) BuryNode(*adagio.Run, *adagio.Node) error {
-	panic("not implemented")
 }
 
 func (r *Repository) Subscribe(events chan<- *adagio.Event, states ...adagio.Node_Status) error {
