@@ -87,6 +87,11 @@ func (p *Pool) Run(ctxt context.Context) {
 }
 
 func (p *Pool) handleEvent(event *adagio.Event) error {
+	runtime, ok := p.runtimes[event.NodeSpec.Runtime]
+	if !ok {
+		return ErrRuntimeDoesNotExist
+	}
+
 	node, claimed, err := p.repo.ClaimNode(event.RunID, event.NodeSpec.Name)
 	if err != nil {
 		return err
@@ -94,11 +99,6 @@ func (p *Pool) handleEvent(event *adagio.Event) error {
 
 	if !claimed {
 		return errors.New("node already claimed")
-	}
-
-	runtime, ok := p.runtimes[node.Spec.Runtime]
-	if !ok {
-		return ErrRuntimeDoesNotExist
 	}
 
 	result, err := runtime.Run(node)
