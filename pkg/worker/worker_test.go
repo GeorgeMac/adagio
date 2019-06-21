@@ -60,7 +60,7 @@ func TestPool_HappyPath(t *testing.T) {
 		assert.Equal(t, []adagio.Node_Status{adagio.Node_READY}, call.statuses)
 
 		// feed each subscriber an event for node "foo"
-		call.events <- &adagio.Event{RunID: "bar", NodeName: "foo"}
+		call.events <- &adagio.Event{RunID: "bar", NodeSpec: &adagio.Node_Spec{Name: "foo", Runtime: "test"}}
 	}
 
 	// stop running
