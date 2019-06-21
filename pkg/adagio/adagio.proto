@@ -16,9 +16,9 @@ message Event {
     STATE_TRANSITION = 0;
   }
 
-  Type   type     = 1;
-  string runID    = 2;
-  string nodeName = 3;
+  Type      type     = 1;
+  string    runID    = 2;
+  Node.Spec nodeSpec = 3;
 }
 
 message GraphSpec {
@@ -33,7 +33,7 @@ message MetadataValue {
 enum Conclusion {
   SUCCESS = 0;
   FAIL = 1;
-  CANCEL = 2;
+  ERROR = 2;
 }
 
 message Node {

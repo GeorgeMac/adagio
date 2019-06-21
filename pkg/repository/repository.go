@@ -101,13 +101,13 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"b": running(b, nil),
 				},
 				Events: []*adagio.Event{
-					{RunID: run.Id, NodeName: "a", Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeName: "a", Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeName: "b", Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeName: "b", Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeName: "c", Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeName: "d", Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeName: "f", Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "a"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "a"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "b"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "b"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "c"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "d"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "f"}, Type: adagio.Event_STATE_TRANSITION},
 				},
 			},
 			{
@@ -135,13 +135,13 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					}),
 				},
 				Events: []*adagio.Event{
-					{RunID: run.Id, NodeName: "c", Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeName: "c", Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeName: "d", Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeName: "d", Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeName: "e", Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeName: "f", Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeName: "f", Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "c"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "c"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "d"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "d"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "e"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "f"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "f"}, Type: adagio.Event_STATE_TRANSITION},
 				},
 			},
 			{
@@ -163,9 +163,9 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					}),
 				},
 				Events: []*adagio.Event{
-					{RunID: run.Id, NodeName: "e", Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeName: "e", Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeName: "g", Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "e"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "e"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "g"}, Type: adagio.Event_STATE_TRANSITION},
 				},
 			},
 			{
@@ -186,8 +186,8 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					}),
 				},
 				Events: []*adagio.Event{
-					{RunID: run.Id, NodeName: "g", Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeName: "g", Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "g"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "g"}, Type: adagio.Event_STATE_TRANSITION},
 				},
 			},
 		} {
@@ -241,7 +241,7 @@ func (l *TestLayer) Exec(t *testing.T) {
 	}
 
 	sort.SliceStable(collected, func(i, j int) bool {
-		return collected[i].NodeName < collected[j].NodeName
+		return collected[i].NodeSpec.Name < collected[j].NodeSpec.Name
 	})
 
 	if l.Events != nil {

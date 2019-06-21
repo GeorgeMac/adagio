@@ -115,7 +115,7 @@ func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
 func (r *Repository) notifyListeners(run *adagio.Run, node *adagio.Node, from, to adagio.Node_Status) {
 	for _, ch := range r.listeners[to] {
 		select {
-		case ch <- &adagio.Event{RunID: run.Id, NodeName: node.Spec.Name, Type: adagio.Event_STATE_TRANSITION}:
+		case ch <- &adagio.Event{RunID: run.Id, NodeSpec: node.Spec, Type: adagio.Event_STATE_TRANSITION}:
 			// attempt to send
 		default:
 		}

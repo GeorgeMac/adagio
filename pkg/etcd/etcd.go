@@ -339,6 +339,18 @@ func (r *Repository) Subscribe(events chan<- *adagio.Event, s ...adagio.Node_Sta
 							continue
 						}
 
+						run, err := r.getRun(context.Background(), keyParts[3])
+						if err != nil {
+							log.Println(err)
+							continue
+						}
+
+						node, err := run.GetNodeByName(keyParts[5])
+						if err != nil {
+							log.Println(err)
+							continue
+						}
+
 						state, err := stateFromString(keyParts[1])
 						if err != nil {
 							log.Println(err)
@@ -349,7 +361,7 @@ func (r *Repository) Subscribe(events chan<- *adagio.Event, s ...adagio.Node_Sta
 							events <- &adagio.Event{
 								Type:     adagio.Event_STATE_TRANSITION,
 								RunID:    keyParts[3],
-								NodeName: keyParts[5],
+								NodeSpec: node.Spec,
 							}
 						}
 					}

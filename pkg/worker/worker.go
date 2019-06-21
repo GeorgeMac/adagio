@@ -9,6 +9,8 @@ import (
 	"github.com/georgemac/adagio/pkg/adagio"
 )
 
+// ErrRuntimeDoesNotExist is returned when a node is claimed with an
+// unkown runtime type
 var ErrRuntimeDoesNotExist = errors.New("runtime does not exist")
 
 type Repository interface {
@@ -73,7 +75,7 @@ func (p *Pool) Run(ctxt context.Context) {
 }
 
 func (p *Pool) handleEvent(event *adagio.Event) error {
-	node, claimed, err := p.repo.ClaimNode(event.RunID, event.NodeName)
+	node, claimed, err := p.repo.ClaimNode(event.RunID, event.NodeSpec.Name)
 	if err != nil {
 		return err
 	}
@@ -93,7 +95,7 @@ func (p *Pool) handleEvent(event *adagio.Event) error {
 		return err
 	}
 
-	if err := p.repo.FinishNode(event.RunID, event.NodeName, result); err != nil {
+	if err := p.repo.FinishNode(event.RunID, event.NodeSpec.Name, result); err != nil {
 		return err
 	}
 
