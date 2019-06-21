@@ -152,5 +152,5 @@ func agent(ctxt context.Context, repo worker.Repository) {
 		}
 	)
 
-	worker.NewPool(repo, runtimes).Run(ctxt)
+	worker.NewPool(repo, runtimes, worker.WorkerCount(5)).Run(ctxt)
 }
