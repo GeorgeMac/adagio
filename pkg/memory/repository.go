@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"sort"
 	"sync"
 	"time"
 
@@ -79,7 +80,28 @@ func (r *Repository) InspectRun(id string) (*adagio.Run, error) {
 		return nil, err
 	}
 
-	return state.run, nil
+	run := state.run
+
+	// check if all node states in order to derive run state
+	var (
+		runRunning   = false
+		runCompleted = true
+	)
+
+	for _, node := range run.Nodes {
+		runRunning = runRunning || (node.Status > adagio.Node_WAITING)
+		runCompleted = runCompleted && (node.Status == adagio.Node_COMPLETED)
+	}
+
+	if runRunning {
+		run.Status = adagio.Run_RUNNING
+	}
+
+	if runCompleted {
+		run.Status = adagio.Run_COMPLETED
+	}
+
+	return run, nil
 }
 
 func (r *Repository) ListRuns() (runs []*adagio.Run, err error) {
@@ -89,6 +111,10 @@ func (r *Repository) ListRuns() (runs []*adagio.Run, err error) {
 	for _, state := range r.runs {
 		runs = append(runs, state.run)
 	}
+
+	sort.Slice(runs, func(i, j int) bool {
+		return runs[i].Id < runs[j].Id
+	})
 
 	return
 }
@@ -115,9 +141,6 @@ func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
 	if node.Status > adagio.Node_READY {
 		return nil, false, nil
 	}
-
-	// update run state to running
-	state.run.Status = adagio.Run_RUNNING
 
 	// update node state to running
 	node.Status = adagio.Node_RUNNING
@@ -163,26 +186,16 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Result) error
 		return errors.Wrapf(err, "finishing node %q", node)
 	}
 
-	if len(outgoing) < 1 {
-		// check if all nodes are complete
-		runCompleted := true
-		for i := 0; i < len(state.run.Nodes) && runCompleted; i++ {
-			runCompleted = runCompleted && (state.run.Nodes[i].Status == adagio.Node_COMPLETED)
-		}
-
-		if runCompleted {
-			state.run.Status = adagio.Run_COMPLETED
-		}
-
-		return nil
+	if result.Conclusion == adagio.Conclusion_SUCCESS {
+		return r.handleSuccess(state, node, outgoing, result)
 	}
 
+	return r.handleFailure(state, node, outgoing, result)
+}
+
+func (r *Repository) handleSuccess(state runState, node *adagio.Node, outgoing map[graph.Node]struct{}, result *adagio.Result) error {
 	for outi := range outgoing {
 		out := outi.(*adagio.Node)
-		incoming, err := state.graph.Incoming(out)
-		if err != nil {
-			return errors.Wrapf(err, "finishing node %q", node)
-		}
 
 		// propagate outputs to inputs of next node
 		if out.Inputs == nil {
@@ -190,6 +203,16 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Result) error
 		}
 
 		out.Inputs[node.Spec.Name] = result.Output
+
+		if out.Status > adagio.Node_WAITING {
+			// do not bother to manipulate outgoing nodes which are not waiting
+			continue
+		}
+
+		incoming, err := state.graph.Incoming(out)
+		if err != nil {
+			return errors.Wrapf(err, "finishing node %q", node)
+		}
 
 		// given all the incoming nodes into "out" are now completed
 		// then the waiting out node can be progressed to ready
@@ -202,6 +225,30 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Result) error
 			out.Status = adagio.Node_READY
 
 			r.notifyListeners(state.run, out, adagio.Node_WAITING, adagio.Node_READY)
+		}
+	}
+
+	return nil
+}
+
+func (r *Repository) handleFailure(state runState, node *adagio.Node, src map[graph.Node]struct{}, result *adagio.Result) error {
+	for outi := range src {
+		out := outi.(*adagio.Node)
+
+		out.Status = adagio.Node_COMPLETED
+		out.StartedAt = r.now().Format(time.RFC3339)
+		out.FinishedAt = r.now().Format(time.RFC3339)
+
+		r.notifyListeners(state.run, out, out.Status, adagio.Node_COMPLETED)
+
+		outgoing, err := state.graph.Outgoing(out)
+		if err != nil {
+			return errors.Wrapf(err, "finishing node %q", node)
+		}
+
+		// descend into child nodes
+		if err := r.handleFailure(state, node, outgoing, result); err != nil {
+			return err
 		}
 	}
 

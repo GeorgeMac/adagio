@@ -341,13 +341,15 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"a": []byte("a"),
 					"b": []byte("b"),
 				}),
-				completed(e, adagio.Conclusion_SUCCESS, map[string][]byte{
+				completed(e, adagio.Conclusion_NONE, map[string][]byte{
 					"c": []byte("c"),
 				}),
-				completed(f, adagio.Conclusion_NONE, map[string][]byte{
+				completed(f, adagio.Conclusion_SUCCESS, map[string][]byte{
 					"b": []byte("b"),
 				}),
-				completed(g, adagio.Conclusion_NONE, nil),
+				completed(g, adagio.Conclusion_NONE, map[string][]byte{
+					"f": []byte("f"),
+				}),
 			}, run.Nodes)
 		})
 	})
@@ -464,7 +466,7 @@ func canFinish(t *testing.T, repo Repository, run *adagio.Run, names map[string]
 	t.Run("can finish", func(t *testing.T) {
 		for name, conclusion := range names {
 			t.Run(fmt.Sprintf("node %q", name), func(t *testing.T) {
-				func(name string, conclusio adagio.Conclusion) {
+				func(name string, conclusion adagio.Conclusion) {
 					t.Parallel()
 
 					assert.Nil(t, repo.FinishNode(run.Id, name, &adagio.Result{
