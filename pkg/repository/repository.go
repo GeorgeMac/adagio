@@ -75,6 +75,8 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 		require.Nil(t, err)
 		require.NotNil(t, run)
 
+		assert.Equal(t, adagio.Run_WAITING, run.Status)
+
 		for _, layer := range []TestLayer{
 			{
 				// (›) ---> (c)----
@@ -186,6 +188,13 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 			layer.Exec(t)
 		}
 
+		t.Run("run is in a completed state", func(t *testing.T) {
+			run, err := repo.InspectRun(run.Id)
+			require.Nil(t, err)
+
+			require.Equal(t, adagio.Run_COMPLETED, run.Status)
+		})
+
 		t.Run("which can be listed", func(t *testing.T) {
 			runs, err := repo.ListRuns()
 			require.Nil(t, err)
@@ -230,6 +239,11 @@ func (l *TestLayer) Exec(t *testing.T) {
 	})
 
 	canFinish(t, l.Repository, l.Run, l.Claimable, adagio.Conclusion_SUCCESS)
+
+	// check run is in running state
+	run, err := l.Repository.InspectRun(l.Run.Id)
+	require.Nil(t, err)
+	require.Equal(t, adagio.Run_RUNNING, run.Status)
 
 	for i := 0; i < len(l.Events); i++ {
 		select {
