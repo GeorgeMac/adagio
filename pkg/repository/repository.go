@@ -75,14 +75,6 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 		require.Nil(t, err)
 		require.NotNil(t, run)
 
-		t.Run("which can be listed", func(t *testing.T) {
-			runs, err := repo.ListRuns()
-			require.Nil(t, err)
-
-			assert.Len(t, runs, 1)
-			assert.Equal(t, run.Id, runs[0].Id)
-		})
-
 		for _, layer := range []TestLayer{
 			{
 				// (›) ---> (c)----
@@ -193,6 +185,14 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 		} {
 			layer.Exec(t)
 		}
+
+		t.Run("which can be listed", func(t *testing.T) {
+			runs, err := repo.ListRuns()
+			require.Nil(t, err)
+
+			assert.Len(t, runs, 1)
+			assert.Equal(t, run.Id, runs[0].Id)
+		})
 	})
 }
 
