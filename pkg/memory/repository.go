@@ -153,6 +153,7 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Result) error
 	}
 
 	node.Status = adagio.Node_COMPLETED
+	node.Conclusion = result.Conclusion
 	node.FinishedAt = r.now().Format(time.RFC3339)
 
 	r.notifyListeners(state.run, node, adagio.Node_RUNNING, adagio.Node_COMPLETED)
