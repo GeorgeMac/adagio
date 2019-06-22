@@ -385,7 +385,7 @@ func (r *Repository) getRun(ctxt context.Context, id string) (*adagio.Run, error
 		Id: id,
 	}
 
-	resp, err := r.kv.Get(ctxt, r.ns.runKey(&adagio.Run{Id: id}))
+	resp, err := r.kv.Get(ctxt, r.ns.runKey(&run))
 	if err != nil {
 		return nil, err
 	}
@@ -401,6 +401,25 @@ func (r *Repository) getRun(ctxt context.Context, id string) (*adagio.Run, error
 	run.Nodes, err = r.nodesForRun(ctxt, run.Id)
 	if err != nil {
 		return nil, err
+	}
+
+	// check if all node states in order to derive run state
+	var (
+		runRunning   = false
+		runCompleted = true
+	)
+
+	for _, node := range run.Nodes {
+		runRunning = runRunning || (node.Status > adagio.Node_WAITING)
+		runCompleted = runCompleted && (node.Status == adagio.Node_COMPLETED)
+	}
+
+	if runRunning {
+		run.Status = adagio.Run_RUNNING
+	}
+
+	if runCompleted {
+		run.Status = adagio.Run_COMPLETED
 	}
 
 	return &run, nil
