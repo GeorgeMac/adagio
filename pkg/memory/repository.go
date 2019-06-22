@@ -116,6 +116,10 @@ func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
 		return nil, false, nil
 	}
 
+	// update run state to running
+	state.run.Status = adagio.Run_RUNNING
+
+	// update node state to running
 	node.Status = adagio.Node_RUNNING
 	node.StartedAt = r.now().Format(time.RFC3339)
 
@@ -156,6 +160,20 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Result) error
 	outgoing, err := state.graph.Outgoing(node)
 	if err != nil {
 		return errors.Wrapf(err, "finishing node %q", node)
+	}
+
+	if len(outgoing) < 1 {
+		// check if all nodes are complete
+		runCompleted := true
+		for i := 0; i < len(state.run.Nodes) && runCompleted; i++ {
+			runCompleted = runCompleted && (state.run.Nodes[i].Status == adagio.Node_COMPLETED)
+		}
+
+		if runCompleted {
+			state.run.Status = adagio.Run_COMPLETED
+		}
+
+		return nil
 	}
 
 	for outi := range outgoing {

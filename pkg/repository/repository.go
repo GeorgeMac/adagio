@@ -103,6 +103,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "d"}, Type: adagio.Event_STATE_TRANSITION},
 					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "f"}, Type: adagio.Event_STATE_TRANSITION},
 				},
+				RunStatus: adagio.Run_RUNNING,
 			},
 			{
 				// (✓) ---> (›)----
@@ -137,6 +138,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "f"}, Type: adagio.Event_STATE_TRANSITION},
 					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "f"}, Type: adagio.Event_STATE_TRANSITION},
 				},
+				RunStatus: adagio.Run_RUNNING,
 			},
 			{
 				// (✓) ---> (✓)----
@@ -161,6 +163,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "e"}, Type: adagio.Event_STATE_TRANSITION},
 					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "g"}, Type: adagio.Event_STATE_TRANSITION},
 				},
+				RunStatus: adagio.Run_RUNNING,
 			},
 			{
 				// (✓) ---> (✓)----
@@ -183,17 +186,11 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "g"}, Type: adagio.Event_STATE_TRANSITION},
 					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "g"}, Type: adagio.Event_STATE_TRANSITION},
 				},
+				RunStatus: adagio.Run_COMPLETED,
 			},
 		} {
 			layer.Exec(t)
 		}
-
-		t.Run("run is in a completed state", func(t *testing.T) {
-			run, err := repo.InspectRun(run.Id)
-			require.Nil(t, err)
-
-			require.Equal(t, adagio.Run_COMPLETED, run.Status)
-		})
 
 		t.Run("which can be listed", func(t *testing.T) {
 			runs, err := repo.ListRuns()
@@ -212,6 +209,7 @@ type TestLayer struct {
 	Unclaimable []string
 	Claimable   map[string]*adagio.Node
 	Events      []*adagio.Event
+	RunStatus   adagio.Run_Status
 }
 
 func (l *TestLayer) Exec(t *testing.T) {
@@ -240,10 +238,12 @@ func (l *TestLayer) Exec(t *testing.T) {
 
 	canFinish(t, l.Repository, l.Run, l.Claimable, adagio.Conclusion_SUCCESS)
 
-	// check run is in running state
-	run, err := l.Repository.InspectRun(l.Run.Id)
-	require.Nil(t, err)
-	require.Equal(t, adagio.Run_RUNNING, run.Status)
+	t.Run(fmt.Sprintf("the run is reported with a status of %q", l.RunStatus), func(t *testing.T) {
+		// check run reports expected status
+		run, err := l.Repository.InspectRun(l.Run.Id)
+		require.Nil(t, err)
+		require.Equal(t, l.RunStatus, run.Status)
+	})
 
 	for i := 0; i < len(l.Events); i++ {
 		select {
