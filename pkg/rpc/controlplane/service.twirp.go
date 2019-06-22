@@ -35,6 +35,8 @@ import url "net/url"
 type ControlPlane interface {
 	Start(context.Context, *StartRequest) (*StartResponse, error)
 
+	Inspect(context.Context, *InspectRequest) (*InspectResponse, error)
+
 	List(context.Context, *ListRequest) (*ListResponse, error)
 }
 
@@ -44,15 +46,16 @@ type ControlPlane interface {
 
 type controlPlaneProtobufClient struct {
 	client HTTPClient
-	urls   [2]string
+	urls   [3]string
 }
 
 // NewControlPlaneProtobufClient creates a Protobuf client that implements the ControlPlane interface.
 // It communicates using Protobuf and can be configured with a custom HTTPClient.
 func NewControlPlaneProtobufClient(addr string, client HTTPClient) ControlPlane {
 	prefix := urlBase(addr) + ControlPlanePathPrefix
-	urls := [2]string{
+	urls := [3]string{
 		prefix + "Start",
+		prefix + "Inspect",
 		prefix + "List",
 	}
 	if httpClient, ok := client.(*http.Client); ok {
@@ -79,12 +82,24 @@ func (c *controlPlaneProtobufClient) Start(ctx context.Context, in *StartRequest
 	return out, nil
 }
 
+func (c *controlPlaneProtobufClient) Inspect(ctx context.Context, in *InspectRequest) (*InspectResponse, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "adagio.rpc.controlplane")
+	ctx = ctxsetters.WithServiceName(ctx, "ControlPlane")
+	ctx = ctxsetters.WithMethodName(ctx, "Inspect")
+	out := new(InspectResponse)
+	err := doProtobufRequest(ctx, c.client, c.urls[1], in, out)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *controlPlaneProtobufClient) List(ctx context.Context, in *ListRequest) (*ListResponse, error) {
 	ctx = ctxsetters.WithPackageName(ctx, "adagio.rpc.controlplane")
 	ctx = ctxsetters.WithServiceName(ctx, "ControlPlane")
 	ctx = ctxsetters.WithMethodName(ctx, "List")
 	out := new(ListResponse)
-	err := doProtobufRequest(ctx, c.client, c.urls[1], in, out)
+	err := doProtobufRequest(ctx, c.client, c.urls[2], in, out)
 	if err != nil {
 		return nil, err
 	}
@@ -97,15 +112,16 @@ func (c *controlPlaneProtobufClient) List(ctx context.Context, in *ListRequest) 
 
 type controlPlaneJSONClient struct {
 	client HTTPClient
-	urls   [2]string
+	urls   [3]string
 }
 
 // NewControlPlaneJSONClient creates a JSON client that implements the ControlPlane interface.
 // It communicates using JSON and can be configured with a custom HTTPClient.
 func NewControlPlaneJSONClient(addr string, client HTTPClient) ControlPlane {
 	prefix := urlBase(addr) + ControlPlanePathPrefix
-	urls := [2]string{
+	urls := [3]string{
 		prefix + "Start",
+		prefix + "Inspect",
 		prefix + "List",
 	}
 	if httpClient, ok := client.(*http.Client); ok {
@@ -132,12 +148,24 @@ func (c *controlPlaneJSONClient) Start(ctx context.Context, in *StartRequest) (*
 	return out, nil
 }
 
+func (c *controlPlaneJSONClient) Inspect(ctx context.Context, in *InspectRequest) (*InspectResponse, error) {
+	ctx = ctxsetters.WithPackageName(ctx, "adagio.rpc.controlplane")
+	ctx = ctxsetters.WithServiceName(ctx, "ControlPlane")
+	ctx = ctxsetters.WithMethodName(ctx, "Inspect")
+	out := new(InspectResponse)
+	err := doJSONRequest(ctx, c.client, c.urls[1], in, out)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *controlPlaneJSONClient) List(ctx context.Context, in *ListRequest) (*ListResponse, error) {
 	ctx = ctxsetters.WithPackageName(ctx, "adagio.rpc.controlplane")
 	ctx = ctxsetters.WithServiceName(ctx, "ControlPlane")
 	ctx = ctxsetters.WithMethodName(ctx, "List")
 	out := new(ListResponse)
-	err := doJSONRequest(ctx, c.client, c.urls[1], in, out)
+	err := doJSONRequest(ctx, c.client, c.urls[2], in, out)
 	if err != nil {
 		return nil, err
 	}
@@ -194,6 +222,9 @@ func (s *controlPlaneServer) ServeHTTP(resp http.ResponseWriter, req *http.Reque
 	switch req.URL.Path {
 	case "/twirp/adagio.rpc.controlplane.ControlPlane/Start":
 		s.serveStart(ctx, resp, req)
+		return
+	case "/twirp/adagio.rpc.controlplane.ControlPlane/Inspect":
+		s.serveInspect(ctx, resp, req)
 		return
 	case "/twirp/adagio.rpc.controlplane.ControlPlane/List":
 		s.serveList(ctx, resp, req)
@@ -312,6 +343,135 @@ func (s *controlPlaneServer) serveStartProtobuf(ctx context.Context, resp http.R
 	}
 	if respContent == nil {
 		s.writeError(ctx, resp, twirp.InternalError("received a nil *StartResponse and nil error while calling Start. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	respBytes, err := proto.Marshal(respContent)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal proto response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	resp.Header().Set("Content-Type", "application/protobuf")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *controlPlaneServer) serveInspect(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	header := req.Header.Get("Content-Type")
+	i := strings.Index(header, ";")
+	if i == -1 {
+		i = len(header)
+	}
+	switch strings.TrimSpace(strings.ToLower(header[:i])) {
+	case "application/json":
+		s.serveInspectJSON(ctx, resp, req)
+	case "application/protobuf":
+		s.serveInspectProtobuf(ctx, resp, req)
+	default:
+		msg := fmt.Sprintf("unexpected Content-Type: %q", req.Header.Get("Content-Type"))
+		twerr := badRouteError(msg, req.Method, req.URL.Path)
+		s.writeError(ctx, resp, twerr)
+	}
+}
+
+func (s *controlPlaneServer) serveInspectJSON(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "Inspect")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	reqContent := new(InspectRequest)
+	unmarshaler := jsonpb.Unmarshaler{AllowUnknownFields: true}
+	if err = unmarshaler.Unmarshal(req.Body, reqContent); err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to parse request json"))
+		return
+	}
+
+	// Call service method
+	var respContent *InspectResponse
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = s.ControlPlane.Inspect(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *InspectResponse and nil error while calling Inspect. nil responses are not supported"))
+		return
+	}
+
+	ctx = callResponsePrepared(ctx, s.hooks)
+
+	var buf bytes.Buffer
+	marshaler := &jsonpb.Marshaler{OrigName: true}
+	if err = marshaler.Marshal(&buf, respContent); err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to marshal json response"))
+		return
+	}
+
+	ctx = ctxsetters.WithStatusCode(ctx, http.StatusOK)
+	respBytes := buf.Bytes()
+	resp.Header().Set("Content-Type", "application/json")
+	resp.Header().Set("Content-Length", strconv.Itoa(len(respBytes)))
+	resp.WriteHeader(http.StatusOK)
+
+	if n, err := resp.Write(respBytes); err != nil {
+		msg := fmt.Sprintf("failed to write response, %d of %d bytes written: %s", n, len(respBytes), err.Error())
+		twerr := twirp.NewError(twirp.Unknown, msg)
+		callError(ctx, s.hooks, twerr)
+	}
+	callResponseSent(ctx, s.hooks)
+}
+
+func (s *controlPlaneServer) serveInspectProtobuf(ctx context.Context, resp http.ResponseWriter, req *http.Request) {
+	var err error
+	ctx = ctxsetters.WithMethodName(ctx, "Inspect")
+	ctx, err = callRequestRouted(ctx, s.hooks)
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+
+	buf, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to read request body"))
+		return
+	}
+	reqContent := new(InspectRequest)
+	if err = proto.Unmarshal(buf, reqContent); err != nil {
+		s.writeError(ctx, resp, wrapInternal(err, "failed to parse request proto"))
+		return
+	}
+
+	// Call service method
+	var respContent *InspectResponse
+	func() {
+		defer ensurePanicResponses(ctx, resp, s.hooks)
+		respContent, err = s.ControlPlane.Inspect(ctx, reqContent)
+	}()
+
+	if err != nil {
+		s.writeError(ctx, resp, err)
+		return
+	}
+	if respContent == nil {
+		s.writeError(ctx, resp, twirp.InternalError("received a nil *InspectResponse and nil error while calling Inspect. nil responses are not supported"))
 		return
 	}
 
@@ -948,21 +1108,24 @@ func callError(ctx context.Context, h *twirp.ServerHooks, err twirp.Error) conte
 }
 
 var twirpFileDescriptor0 = []byte{
-	// 254 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x84, 0x91, 0x41, 0x4b, 0xc4, 0x30,
-	0x10, 0x85, 0x29, 0x5b, 0x3d, 0x4c, 0xbb, 0x07, 0x83, 0xb8, 0x4b, 0x41, 0x5c, 0x82, 0x15, 0x4f,
-	0x29, 0xac, 0xf8, 0x07, 0xf4, 0xe0, 0xc5, 0x83, 0xb4, 0xe0, 0xc1, 0x5b, 0x8c, 0x61, 0x2d, 0x2e,
-	0xc9, 0x38, 0x49, 0xfd, 0x73, 0xfe, 0x39, 0x69, 0x92, 0x85, 0x22, 0xbb, 0xec, 0x29, 0x24, 0xef,
-	0x7d, 0x99, 0xf7, 0x18, 0xe0, 0xf8, 0xb5, 0x69, 0x08, 0x55, 0xa3, 0xac, 0xf1, 0x64, 0xb7, 0xb8,
-	0x95, 0x46, 0x37, 0x4e, 0xd3, 0x4f, 0xaf, 0xb4, 0x40, 0xb2, 0xde, 0xb2, 0x85, 0xfc, 0x90, 0x9b,
-	0xde, 0x0a, 0x42, 0x25, 0xa6, 0xb6, 0x6a, 0x31, 0xc2, 0x51, 0x4c, 0x47, 0x24, 0xf8, 0x3d, 0x94,
-	0x9d, 0x97, 0xe4, 0x5b, 0xfd, 0x3d, 0x68, 0xe7, 0x59, 0x0d, 0xb9, 0x43, 0xad, 0x96, 0xd9, 0x2a,
-	0xbb, 0x2d, 0xd6, 0x67, 0x22, 0x99, 0x9f, 0x48, 0xe2, 0x67, 0x87, 0x5a, 0xb5, 0x41, 0xe6, 0x02,
-	0xe6, 0x09, 0x73, 0x68, 0x8d, 0xd3, 0xec, 0x12, 0x66, 0x34, 0x98, 0x84, 0x15, 0x3b, 0xac, 0x1d,
-	0x4c, 0x3b, 0xbe, 0xf3, 0x39, 0x14, 0xcf, 0xbd, 0xdb, 0x4d, 0xe1, 0x0d, 0x94, 0xf1, 0x9a, 0xe8,
-	0x2b, 0xc8, 0x69, 0x30, 0x6e, 0x99, 0xad, 0x66, 0xff, 0xf1, 0x20, 0xac, 0x7f, 0x33, 0x28, 0x1f,
-	0x63, 0xa1, 0x97, 0xb1, 0x10, 0x7b, 0x85, 0x93, 0x10, 0x80, 0xd5, 0xe2, 0x40, 0x67, 0x31, 0xed,
-	0x55, 0xdd, 0x1c, 0xb3, 0xa5, 0x24, 0x1d, 0xe4, 0x63, 0x32, 0x76, 0x7d, 0xd0, 0x3f, 0xe9, 0x51,
-	0xd5, 0x47, 0x5c, 0xf1, 0xd3, 0x87, 0x8b, 0xb7, 0xf3, 0x7d, 0xcb, 0x7b, 0x3f, 0x0d, 0x3b, 0xb8,
-	0xfb, 0x0b, 0x00, 0x00, 0xff, 0xff, 0x6d, 0x09, 0xe1, 0xef, 0xdb, 0x01, 0x00, 0x00,
+	// 298 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x8c, 0x92, 0x41, 0x4b, 0xc3, 0x30,
+	0x18, 0x86, 0x59, 0x57, 0x15, 0xbf, 0x76, 0x13, 0x83, 0xb8, 0x51, 0x10, 0x4b, 0xb0, 0xba, 0x53,
+	0x2a, 0x13, 0xff, 0x80, 0x1e, 0x44, 0xf0, 0x20, 0x2d, 0x78, 0x10, 0x2f, 0x35, 0x0d, 0xb3, 0x38,
+	0x92, 0x98, 0xb4, 0xfe, 0x17, 0xff, 0xad, 0x34, 0xc9, 0x46, 0x15, 0x4b, 0x3d, 0x95, 0xf6, 0x7b,
+	0x9e, 0xb7, 0xf9, 0x5e, 0x02, 0x58, 0xbe, 0xaf, 0x52, 0x25, 0x69, 0x4a, 0x05, 0xaf, 0x95, 0x58,
+	0xcb, 0x75, 0xc1, 0x59, 0xaa, 0x99, 0xfa, 0xac, 0x28, 0x23, 0x52, 0x89, 0x5a, 0xa0, 0x59, 0x51,
+	0x16, 0xab, 0x4a, 0x10, 0x25, 0x29, 0xe9, 0x62, 0xd1, 0xac, 0x95, 0xed, 0xd0, 0x3d, 0xac, 0x81,
+	0xaf, 0x21, 0xcc, 0xeb, 0x42, 0xd5, 0x19, 0xfb, 0x68, 0x98, 0xae, 0x51, 0x02, 0xbe, 0x96, 0x8c,
+	0xce, 0x47, 0xf1, 0x68, 0x11, 0x2c, 0x0f, 0x89, 0x83, 0xef, 0x54, 0x21, 0xdf, 0x72, 0xc9, 0x68,
+	0x66, 0xc6, 0x98, 0xc0, 0xc4, 0x69, 0x5a, 0x0a, 0xae, 0x19, 0x3a, 0x81, 0xb1, 0x6a, 0xb8, 0xd3,
+	0x82, 0x8d, 0x96, 0x35, 0x3c, 0x6b, 0xbf, 0xe3, 0x18, 0xa6, 0xf7, 0xbc, 0x35, 0xb7, 0x3f, 0x9a,
+	0x82, 0x57, 0x95, 0x86, 0xdf, 0xcf, 0xbc, 0xaa, 0xc4, 0x97, 0x70, 0xb0, 0x25, 0xfe, 0x97, 0x39,
+	0x81, 0xe0, 0xa1, 0xd2, 0x9b, 0x40, 0x9c, 0x42, 0x68, 0x5f, 0x9d, 0x7d, 0x0a, 0xbe, 0x6a, 0xb8,
+	0x9e, 0x8f, 0xe2, 0xf1, 0x6f, 0xdd, 0x0c, 0x96, 0x5f, 0x1e, 0x84, 0xb7, 0xb6, 0xa4, 0xc7, 0xb6,
+	0x24, 0xf4, 0x04, 0x3b, 0x66, 0x29, 0x94, 0x90, 0x9e, 0x1e, 0x49, 0xb7, 0xab, 0xe8, 0x7c, 0x08,
+	0x73, 0x27, 0x79, 0x81, 0x3d, 0xb7, 0x1a, 0xba, 0xe8, 0x55, 0x7e, 0xd6, 0x13, 0x2d, 0x86, 0x41,
+	0x97, 0x9e, 0x83, 0xdf, 0xee, 0x8d, 0xce, 0x7a, 0x8d, 0x4e, 0x4b, 0x51, 0x32, 0x40, 0xd9, 0xd0,
+	0x9b, 0xe3, 0xe7, 0xa3, 0xbf, 0xae, 0xdb, 0xeb, 0xae, 0xb9, 0x35, 0x57, 0xdf, 0x01, 0x00, 0x00,
+	0xff, 0xff, 0xcc, 0x6d, 0x6b, 0x05, 0x8d, 0x02, 0x00, 0x00,
 }

@@ -29,8 +29,7 @@ func main() {
 	fs.Parse(os.Args[1:])
 
 	if fs.NArg() < 1 {
-		fs.Usage()
-		os.Exit(2)
+		exit(fs.Usage, 2)
 	}
 
 	var (
@@ -42,7 +41,24 @@ func main() {
 	case "runs":
 		runs(ctxt, client, fs.Args())
 	default:
-		fs.Usage()
-		os.Exit(2)
+		exit(fs.Usage, 2)
 	}
+}
+
+func exitIfError(err error) {
+	if err == nil {
+		return
+	}
+
+	exit(err, 1)
+}
+
+func exit(v interface{}, code int) {
+	if fn, ok := v.(func()); ok {
+		fn()
+		os.Exit(code)
+	}
+
+	fmt.Println(v)
+	os.Exit(code)
 }

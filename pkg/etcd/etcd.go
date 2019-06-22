@@ -100,6 +100,10 @@ func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err erro
 	return
 }
 
+func (r *Repository) InspectRun(id string) (*adagio.Run, error) {
+	return r.getRun(context.Background(), id)
+}
+
 func (r *Repository) ListRuns() (runs []*adagio.Run, err error) {
 	ctxt := context.Background()
 	resp, err := r.kv.Get(ctxt, r.ns.runs(), clientv3.WithPrefix())
