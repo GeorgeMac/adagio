@@ -21,6 +21,7 @@ func (fn FormatterFunc) Format(f fmt.State, c rune) {
 	fn(f, c)
 }
 
+// Dot takes an adagio Run proto struct and returns a formatter
 func Dot(pbrun *adagio.Run) (fmt.Formatter, error) {
 	return FormatterFunc(func(w fmt.State, c rune) {
 		fmt.Fprintf(w, "digraph %q {\n", pbrun.Id)
