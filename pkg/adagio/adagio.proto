@@ -31,9 +31,10 @@ message MetadataValue {
 }
 
 enum Conclusion {
-  SUCCESS = 0;
-  FAIL = 1;
-  ERROR = 2;
+  NONE = 0;
+  SUCCESS = 1;
+  FAIL = 2;
+  ERROR = 3;
 }
 
 message Node {
