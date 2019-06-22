@@ -112,8 +112,11 @@ func (r *Repository) ListRuns() (runs []*adagio.Run, err error) {
 	}
 
 	for _, kv := range resp.Kvs {
-		parts := strings.SplitN(r.ns.stripBytes(kv.Key), "/", 2)
-		if len(parts) < 2 {
+		parts := strings.Split(r.ns.stripBytes(kv.Key), "/")
+
+		// ignore malformed or output keys
+		// runs/<run_id>/nodes/<node_id>/output
+		if len(parts) < 2 || (len(parts) == 5 && parts[4] == "output") {
 			continue
 		}
 
