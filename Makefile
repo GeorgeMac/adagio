@@ -4,11 +4,11 @@ install: ## Install adagio and adagiod
 
 .PHONY: test
 test: ## Run test suite
-	go test -cover -mod=vendor ./...
+	go test -cover -race -mod=vendor ./...
 
 .PHONY: test-with-integrations
 test-with-integrations: ## Run test suite with integrations (i.e. etcd)
-	go test -cover -mod=vendor -tags etcd ./...
+	go test -cover -count 5 -race -mod=vendor -tags etcd ./...
 
 .PHONY: deps
 deps: ## Fetch and vendor dependencies

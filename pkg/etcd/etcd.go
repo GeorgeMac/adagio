@@ -287,6 +287,11 @@ func (r *Repository) handleSuccess(ctxt context.Context, run *adagio.Run, node *
 	for o := range outgoing {
 		out := o.(*adagio.Node)
 
+		if out.Status > adagio.Node_WAITING {
+			// outgoing node has already progressed from waiting state
+			continue
+		}
+
 		isReady := true
 
 		incoming, err := graph.Incoming(out)
