@@ -118,6 +118,8 @@ func statusToString(state adagio.Node_Status) (string, error) {
 
 func conclusionToString(conclusion adagio.Conclusion) (string, error) {
 	switch conclusion {
+	case adagio.Conclusion_NONE:
+		return "none", nil
 	case adagio.Conclusion_SUCCESS:
 		return "success", nil
 	case adagio.Conclusion_FAIL:
