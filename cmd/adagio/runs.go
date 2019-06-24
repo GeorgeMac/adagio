@@ -201,11 +201,11 @@ func list(ctxt context.Context, client controlplane.ControlPlane) {
 	resp, err := client.List(ctxt, &controlplane.ListRequest{})
 	exitIfError(err)
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.AlignRight|tabwriter.Debug)
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)
 
-	fmt.Fprintln(w, "ID\tCreated At\t")
+	fmt.Fprintln(w, "ID\tCreated At\tStatus\t")
 	for _, run := range resp.Runs {
-		fmt.Fprintf(w, "%s\t%s\t\n", run.Id, run.CreatedAt)
+		fmt.Fprintf(w, "%s\t%s\t%s\t\n", run.Id, run.CreatedAt, run.Status)
 	}
 
 	w.Flush()
