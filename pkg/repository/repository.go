@@ -235,7 +235,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"e": []byte("e"),
 					"f": []byte("f"),
 				}),
-			}, run.Nodes)
+			}, runs[0].Nodes)
 		})
 	})
 
@@ -350,7 +350,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				completed(g, adagio.Conclusion_NONE, map[string][]byte{
 					"f": []byte("f"),
 				}),
-			}, run.Nodes)
+			}, runs[1].Nodes)
 		})
 	})
 }
@@ -405,6 +405,7 @@ func (l *TestLayer) Exec(t *testing.T) {
 			collected = append(collected, event)
 		case <-time.After(5 * time.Second):
 			t.Error("timeout collecting events")
+			return
 		}
 	}
 

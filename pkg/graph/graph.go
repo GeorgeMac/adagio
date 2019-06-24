@@ -134,24 +134,50 @@ func (g *Graph) TopologicalSort() []Node {
 	return reverse(g.dfsForward())
 }
 
-type WalkDirection uint8
+type VisitFunc func(Node) error
 
-const (
-	Backwards WalkDirection = iota
-	Forwards
-)
-
-type VisitFunc func(Node)
-
-func (g *Graph) Walk(dir WalkDirection, fn VisitFunc) {
-	direction := g.dfsForward
-	if dir > Backwards {
-		direction = g.TopologicalSort
-	}
-
-	for _, node := range direction() {
+func (g *Graph) Walk(fn VisitFunc) {
+	for _, node := range g.dfsForward() {
 		fn(node)
 	}
+}
+
+func (g *Graph) WalkFrom(node Node, fn VisitFunc) error {
+	var (
+		set           = g.forward.clone()
+		toExplore, ok = set.remove(node)
+	)
+
+	if !ok {
+		return wrapMissingErr(node)
+	}
+
+	for node := range toExplore {
+		if err := walkFrom(set, node, fn); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func walkFrom(set edgeSet, node Node, fn VisitFunc) error {
+	toExplore, ok := set.remove(node)
+	if !ok {
+		return nil
+	}
+
+	if err := fn(node); err != nil {
+		return err
+	}
+
+	for node := range toExplore {
+		if err := walkFrom(set, node, fn); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (g *Graph) dfsForward() []Node {
