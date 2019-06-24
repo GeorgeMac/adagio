@@ -146,7 +146,13 @@ func agent(ctxt context.Context, repo worker.Repository) {
 	var (
 		runtimes = map[string]worker.Runtime{
 			"echo": worker.RuntimeFunc(func(node *adagio.Node) (*adagio.Result, error) {
-				return &adagio.Result{Output: []byte(fmt.Sprintf("got node %s\n", node))}, nil
+				return &adagio.Result{
+					Conclusion: adagio.Conclusion_SUCCESS,
+					Output:     []byte(fmt.Sprintf("got node %s\n", node)),
+				}, nil
+			}),
+			"fail": worker.RuntimeFunc(func(node *adagio.Node) (*adagio.Result, error) {
+				return &adagio.Result{Conclusion: adagio.Conclusion_FAIL}, nil
 			}),
 			"exec": exec.New(),
 		}

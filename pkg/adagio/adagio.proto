@@ -5,10 +5,17 @@ package adagio;
 option go_package = "github.com/georgemac/adagio/pkg/adagio";
 
 message Run {
+  enum Status {
+    WAITING = 0;
+    RUNNING = 1;
+    COMPLETED = 2;
+  }
+
   string id = 1;
   string created_at = 2;
   repeated Node nodes = 3;
   repeated Edge edges = 4;
+  Status status = 5;
 }
 
 message Event {
@@ -31,9 +38,10 @@ message MetadataValue {
 }
 
 enum Conclusion {
-  SUCCESS = 0;
-  FAIL = 1;
-  ERROR = 2;
+  NONE = 0;
+  SUCCESS = 1;
+  FAIL = 2;
+  ERROR = 3;
 }
 
 message Node {

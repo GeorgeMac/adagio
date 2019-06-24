@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
+	"github.com/georgemac/adagio/pkg/graph"
 	"github.com/georgemac/adagio/pkg/worker"
 	"go.etcd.io/etcd/clientv3"
 )
@@ -147,7 +148,7 @@ func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
 		return nil, false, adagio.ErrNodeNotReady
 	}
 
-	cmps, ops, err := r.transition(ctxt, runID, node, adagio.Node_RUNNING)
+	cmps, ops, err := r.transition(ctxt, runID, node, adagio.Node_RUNNING, nil, nil)
 	if err != nil {
 		return nil, false, err
 	}
@@ -164,33 +165,26 @@ func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
 		return nil, false, nil
 	}
 
-	// for each incoming node fetch their outputs
-	incoming, err := adagio.GraphFrom(run).Incoming(node)
-	if err != nil {
-		return nil, false, err
-	}
-
-	for ini := range incoming {
-		in := ini.(*adagio.Node)
-
-		resp, err := r.kv.Get(ctxt, r.ns.output(runID, in.Spec.Name))
-		if err != nil {
-			return nil, false, err
-		}
-
-		if len(resp.Kvs) > 0 {
-			if node.Inputs == nil {
-				node.Inputs = map[string][]byte{}
-			}
-
-			node.Inputs[in.Spec.Name] = resp.Kvs[0].Value
-		}
-	}
-
 	return node, resp.Succeeded, nil
 }
 
-func (r *Repository) transition(ctxt context.Context, runID string, node *adagio.Node, toStatus adagio.Node_Status) ([]clientv3.Cmp, []clientv3.Op, error) {
+func (r *Repository) complete(ctxt context.Context, runID string, node *adagio.Node, result *adagio.Result, cmps []clientv3.Cmp, ops []clientv3.Op) ([]clientv3.Cmp, []clientv3.Op, error) {
+	node.Conclusion = result.Conclusion
+
+	var err error
+	cmps, ops, err = r.transition(ctxt, runID, node, adagio.Node_COMPLETED, cmps, ops)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if result.Conclusion == adagio.Conclusion_SUCCESS {
+		ops = append(ops, clientv3.OpPut(r.ns.output(runID, node.Spec.Name), string(result.Output)))
+	}
+
+	return cmps, ops, nil
+}
+
+func (r *Repository) transition(ctxt context.Context, runID string, node *adagio.Node, toStatus adagio.Node_Status, cmps []clientv3.Cmp, ops []clientv3.Op) ([]clientv3.Cmp, []clientv3.Op, error) {
 	from, err := stateToString(node.Status)
 	if err != nil {
 		return nil, nil, err
@@ -212,7 +206,12 @@ func (r *Repository) transition(ctxt context.Context, runID string, node *adagio
 	case adagio.Node_RUNNING:
 		node.StartedAt = r.now().Format(time.RFC3339)
 	case adagio.Node_COMPLETED:
-		node.FinishedAt = r.now().Format(time.RFC3339)
+		now := r.now()
+		if node.StartedAt == "" {
+			node.StartedAt = now.Format(time.RFC3339)
+		}
+
+		node.FinishedAt = now.Format(time.RFC3339)
 	}
 
 	data, err := json.Marshal(node)
@@ -220,13 +219,13 @@ func (r *Repository) transition(ctxt context.Context, runID string, node *adagio
 		return nil, nil, err
 	}
 
-	return []clientv3.Cmp{
+	return append(cmps,
 			clientv3.Compare(clientv3.Version(fromKey), ">", 0),
-			clientv3.Compare(clientv3.Version(toKey), "=", 0),
-		}, []clientv3.Op{
+			clientv3.Compare(clientv3.Version(toKey), "=", 0)),
+		append(ops,
 			clientv3.OpPut(toKey, string(data)),
 			clientv3.OpDelete(fromKey),
-		}, nil
+		), nil
 }
 
 func (r *Repository) FinishNode(runID, name string, result *adagio.Result) error {
@@ -245,28 +244,59 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Result) error
 		return errors.New("attempt to finish non-running node")
 	}
 
-	graph := adagio.GraphFrom(run)
-
-	cmps, ops, err := r.transition(ctxt, runID, node, adagio.Node_COMPLETED)
+	cmps, ops, err := r.complete(ctxt, run.Id, node, result, nil, nil)
 	if err != nil {
 		return err
 	}
 
-	ops = append(ops, clientv3.OpPut(r.ns.output(run.Id, node.Spec.Name), string(result.Output)))
+	if result.Conclusion == adagio.Conclusion_SUCCESS {
+		cmps, ops, err = r.handleSuccess(ctxt, run, node, result, cmps, ops)
+		if err != nil {
+			return err
+		}
+	} else {
+		cmps, ops, err = r.handleFailure(ctxt, run, node, result, cmps, ops)
+		if err != nil {
+			return err
+		}
+	}
+
+	resp, err := r.kv.Txn(ctxt).
+		If(cmps...).
+		Then(ops...).
+		Commit()
+	if err != nil {
+		return err
+	}
+
+	if !resp.Succeeded {
+		return r.FinishNode(run.Id, node.Spec.Name, result)
+	}
+
+	return nil
+}
+
+func (r *Repository) handleSuccess(ctxt context.Context, run *adagio.Run, node *adagio.Node, result *adagio.Result, cmps []clientv3.Cmp, ops []clientv3.Op) ([]clientv3.Cmp, []clientv3.Op, error) {
+	graph := adagio.GraphFrom(run)
 
 	outgoing, err := graph.Outgoing(node)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	for o := range outgoing {
 		out := o.(*adagio.Node)
 
+		if out.Status > adagio.Node_WAITING {
+			// outgoing node has already progressed from waiting state
+			continue
+		}
+
 		isReady := true
 
 		incoming, err := graph.Incoming(out)
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
 
 		for v := range incoming {
@@ -280,41 +310,45 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Result) error
 
 			state, err := stateToString(in.Status)
 			if err != nil {
-				return err
+				return nil, nil, err
 			}
 
-			currentKey := r.ns.nodeInStateKey(runID, state, in.Spec.Name)
+			currentKey := r.ns.nodeInStateKey(run.Id, state, in.Spec.Name)
 			cmps = append(cmps, clientv3.Compare(clientv3.Version(currentKey), ">", 0))
 		}
 
 		// if all nodes are now completed
 		// then the outgoing target is ready
 		if isReady {
-			outCmps, outOps, err := r.transition(ctxt, runID, out, adagio.Node_READY)
+			cmps, ops, err = r.transition(ctxt, run.Id, out, adagio.Node_READY, cmps, ops)
 			if err != nil {
-				return err
+				return nil, nil, err
 			}
-
-			cmps = append(cmps, outCmps...)
-			ops = append(ops, outOps...)
 		}
 	}
 
-	resp, err := r.kv.Txn(ctxt).
-		If(cmps...).
-		Then(ops...).
-		Commit()
-	if err != nil {
-		return err
-	}
-
-	if !resp.Succeeded {
-		return r.FinishNode(runID, name, result)
-	}
-
-	return nil
+	return cmps, ops, nil
 }
 
+func (r *Repository) handleFailure(ctxt context.Context, run *adagio.Run, node *adagio.Node, result *adagio.Result, cmps []clientv3.Cmp, ops []clientv3.Op) ([]clientv3.Cmp, []clientv3.Op, error) {
+	if err := adagio.GraphFrom(run).WalkFrom(node, func(gnode graph.Node) error {
+		var (
+			node, _ = gnode.(*adagio.Node)
+			err     error
+		)
+
+		cmps, ops, err = r.complete(ctxt, run.Id, node, &adagio.Result{}, cmps, ops)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		return nil, nil, err
+	}
+
+	return cmps, ops, nil
+}
 func (r *Repository) Subscribe(events chan<- *adagio.Event, s ...adagio.Node_Status) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -381,11 +415,11 @@ func (r *Repository) Subscribe(events chan<- *adagio.Event, s ...adagio.Node_Sta
 }
 
 func (r *Repository) getRun(ctxt context.Context, id string) (*adagio.Run, error) {
-	run := adagio.Run{
+	run := &adagio.Run{
 		Id: id,
 	}
 
-	resp, err := r.kv.Get(ctxt, r.ns.runKey(&adagio.Run{Id: id}))
+	resp, err := r.kv.Get(ctxt, r.ns.runKey(run))
 	if err != nil {
 		return nil, err
 	}
@@ -394,51 +428,87 @@ func (r *Repository) getRun(ctxt context.Context, id string) (*adagio.Run, error
 		return nil, errors.New("run not found")
 	}
 
-	if err := unmarshalRun(resp.Kvs[0].Value, &run); err != nil {
+	if err := unmarshalRun(resp.Kvs[0].Value, run); err != nil {
 		return nil, err
 	}
 
-	run.Nodes, err = r.nodesForRun(ctxt, run.Id)
-	if err != nil {
+	if err := r.nodesForRun(ctxt, run); err != nil {
 		return nil, err
 	}
 
-	return &run, nil
+	// check if all node states in order to derive run state
+	var (
+		runRunning   = false
+		runCompleted = true
+	)
+
+	for _, node := range run.Nodes {
+		runRunning = runRunning || (node.Status > adagio.Node_WAITING)
+		runCompleted = runCompleted && (node.Status == adagio.Node_COMPLETED)
+	}
+
+	if runRunning {
+		run.Status = adagio.Run_RUNNING
+	}
+
+	if runCompleted {
+		run.Status = adagio.Run_COMPLETED
+	}
+
+	return run, nil
 }
 
-func (r *Repository) getNode(ctxt context.Context, key string) (*adagio.Node, error) {
-	node := &adagio.Node{}
-
-	resp, err := r.kv.Get(ctxt, key)
+func (r *Repository) setInputs(ctxt context.Context, run *adagio.Run, node *adagio.Node) error {
+	// for each incoming node fetch their outputs
+	incoming, err := adagio.GraphFrom(run).Incoming(node)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	if len(resp.Kvs) < 1 {
-		return nil, adagio.ErrMissingNode
+	for ini := range incoming {
+		in := ini.(*adagio.Node)
+
+		resp, err := r.kv.Get(ctxt, r.ns.output(run.Id, in.Spec.Name))
+		if err != nil {
+			return err
+		}
+
+		if len(resp.Kvs) > 0 {
+			if node.Inputs == nil {
+				node.Inputs = map[string][]byte{}
+			}
+
+			node.Inputs[in.Spec.Name] = resp.Kvs[0].Value
+		}
 	}
 
-	return node, json.Unmarshal(resp.Kvs[0].Value, node)
+	return nil
 }
 
-func (r *Repository) nodesForRun(ctxt context.Context, id string) (nodes []*adagio.Node, err error) {
+func (r *Repository) nodesForRun(ctxt context.Context, run *adagio.Run) (err error) {
 	for _, state := range []string{"waiting", "ready", "running", "completed"} {
 		var (
-			prefix    = r.ns.nodesInStateKey(id, state)
+			prefix    = r.ns.nodesInStateKey(run.Id, state)
 			resp, err = r.kv.Get(ctxt, prefix, clientv3.WithPrefix())
 		)
 
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		for _, kv := range resp.Kvs {
 			node := &adagio.Node{}
 			if err := json.Unmarshal(kv.Value, node); err != nil {
-				return nil, err
+				return err
 			}
 
-			nodes = append(nodes, node)
+			run.Nodes = append(run.Nodes, node)
+		}
+	}
+
+	for _, node := range run.Nodes {
+		if err = r.setInputs(ctxt, run, node); err != nil {
+			return
 		}
 	}
 
