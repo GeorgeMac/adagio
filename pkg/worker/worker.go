@@ -18,7 +18,7 @@ var ErrRuntimeDoesNotExist = errors.New("runtime does not exist")
 // of executing a node
 type Repository interface {
 	ClaimNode(runID, name string) (*adagio.Node, bool, error)
-	FinishNode(runID, name string, result *adagio.Result) error
+	FinishNode(runID, name string, result *adagio.Node_Result) error
 	Subscribe(events chan<- *adagio.Event, states ...adagio.Node_Status) error
 }
 
@@ -102,11 +102,17 @@ func (p *Pool) handleEvent(event *adagio.Event) error {
 	}
 
 	result, err := runtime.Run(node)
-	if err != nil {
-		result.Conclusion = adagio.Conclusion_ERROR
+	nodeResult := &adagio.Node_Result{
+		Conclusion: adagio.Node_Result_Conclusion(result.Conclusion),
+		Metadata:   result.Metadata,
+		Output:     result.Output,
 	}
 
-	if err := p.repo.FinishNode(event.RunID, event.NodeSpec.Name, result); err != nil {
+	if err != nil {
+		nodeResult.Conclusion = adagio.Node_Result_ERROR
+	}
+
+	if err := p.repo.FinishNode(event.RunID, event.NodeSpec.Name, nodeResult); err != nil {
 		return err
 	}
 

@@ -66,10 +66,10 @@ func (r *repository) ClaimNode(runID string, name string) (*adagio.Node, bool, e
 
 type finishCall struct {
 	runID, name string
-	result      *adagio.Result
+	result      *adagio.Node_Result
 }
 
-func (r *repository) FinishNode(runID string, name string, result *adagio.Result) error {
+func (r *repository) FinishNode(runID string, name string, result *adagio.Node_Result) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

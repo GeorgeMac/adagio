@@ -29,7 +29,7 @@ func TestPool_HappyPath(t *testing.T) {
 				atomic.AddUint64(&runtimeCalls, 1)
 
 				return &adagio.Result{
-					Conclusion: adagio.Conclusion_SUCCESS,
+					Conclusion: adagio.Result_SUCCESS,
 				}, nil
 			}),
 		}
@@ -73,8 +73,8 @@ func TestPool_HappyPath(t *testing.T) {
 
 	// ensure 1 finish call is made
 	require.Len(t, repo.finishCalls, 1)
-	assert.Equal(t, finishCall{"bar", "foo", &adagio.Result{
-		Conclusion: adagio.Conclusion_SUCCESS,
+	assert.Equal(t, finishCall{"bar", "foo", &adagio.Node_Result{
+		Conclusion: adagio.Node_Result_SUCCESS,
 	}}, repo.finishCalls[0])
 
 	// ensure runtime was invoked once
@@ -97,7 +97,7 @@ func TestPool_Error_RuntimeDoesNotExist(t *testing.T) {
 				atomic.AddUint64(&runtimeCalls, 1)
 
 				return &adagio.Result{
-					Conclusion: adagio.Conclusion_ERROR,
+					Conclusion: adagio.Result_SUCCESS,
 				}, nil
 			}),
 		}
@@ -204,8 +204,8 @@ func TestPool_Error_RuntimeError(t *testing.T) {
 
 	// ensure 1 finish call is made
 	require.Len(t, repo.finishCalls, 1)
-	assert.Equal(t, finishCall{"bar", "foo", &adagio.Result{
-		Conclusion: adagio.Conclusion_ERROR,
+	assert.Equal(t, finishCall{"bar", "foo", &adagio.Node_Result{
+		Conclusion: adagio.Node_Result_ERROR,
 	}}, repo.finishCalls[0])
 
 	// ensure runtime was never invoked

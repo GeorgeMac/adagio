@@ -144,8 +144,12 @@ func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
 		return nil, false, err
 	}
 
-	if node.Status != adagio.Node_READY {
+	if node.Status == adagio.Node_WAITING {
 		return nil, false, adagio.ErrNodeNotReady
+	}
+
+	if node.Status != adagio.Node_READY {
+		return nil, false, nil
 	}
 
 	cmps, ops, err := r.transition(ctxt, runID, node, adagio.Node_RUNNING, nil, nil)
@@ -168,17 +172,15 @@ func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
 	return node, resp.Succeeded, nil
 }
 
-func (r *Repository) complete(ctxt context.Context, runID string, node *adagio.Node, result *adagio.Result, cmps []clientv3.Cmp, ops []clientv3.Op) ([]clientv3.Cmp, []clientv3.Op, error) {
-	node.Conclusion = result.Conclusion
+func (r *Repository) complete(ctxt context.Context, runID string, node *adagio.Node, result *adagio.Node_Result, cmps []clientv3.Cmp, ops []clientv3.Op) ([]clientv3.Cmp, []clientv3.Op, error) {
+	if result != nil {
+		node.Attempts = append(node.Attempts, result)
+	}
 
 	var err error
 	cmps, ops, err = r.transition(ctxt, runID, node, adagio.Node_COMPLETED, cmps, ops)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	if result.Conclusion == adagio.Conclusion_SUCCESS {
-		ops = append(ops, clientv3.OpPut(r.ns.output(runID, node.Spec.Name), string(result.Output)))
 	}
 
 	return cmps, ops, nil
@@ -228,7 +230,7 @@ func (r *Repository) transition(ctxt context.Context, runID string, node *adagio
 		), nil
 }
 
-func (r *Repository) FinishNode(runID, name string, result *adagio.Result) error {
+func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result) error {
 	ctxt := context.Background()
 	run, err := r.getRun(ctxt, runID)
 	if err != nil {
@@ -249,13 +251,13 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Result) error
 		return err
 	}
 
-	if result.Conclusion == adagio.Conclusion_SUCCESS {
+	if result.Conclusion == adagio.Node_Result_SUCCESS {
 		cmps, ops, err = r.handleSuccess(ctxt, run, node, result, cmps, ops)
 		if err != nil {
 			return err
 		}
 	} else {
-		cmps, ops, err = r.handleFailure(ctxt, run, node, result, cmps, ops)
+		cmps, ops, err = r.handleFailure(ctxt, run, node, cmps, ops)
 		if err != nil {
 			return err
 		}
@@ -276,7 +278,7 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Result) error
 	return nil
 }
 
-func (r *Repository) handleSuccess(ctxt context.Context, run *adagio.Run, node *adagio.Node, result *adagio.Result, cmps []clientv3.Cmp, ops []clientv3.Op) ([]clientv3.Cmp, []clientv3.Op, error) {
+func (r *Repository) handleSuccess(ctxt context.Context, run *adagio.Run, node *adagio.Node, result *adagio.Node_Result, cmps []clientv3.Cmp, ops []clientv3.Op) ([]clientv3.Cmp, []clientv3.Op, error) {
 	graph := adagio.GraphFrom(run)
 
 	outgoing, err := graph.Outgoing(node)
@@ -330,14 +332,16 @@ func (r *Repository) handleSuccess(ctxt context.Context, run *adagio.Run, node *
 	return cmps, ops, nil
 }
 
-func (r *Repository) handleFailure(ctxt context.Context, run *adagio.Run, node *adagio.Node, result *adagio.Result, cmps []clientv3.Cmp, ops []clientv3.Op) ([]clientv3.Cmp, []clientv3.Op, error) {
+func (r *Repository) handleFailure(ctxt context.Context, run *adagio.Run, node *adagio.Node, cmps []clientv3.Cmp, ops []clientv3.Op) ([]clientv3.Cmp, []clientv3.Op, error) {
 	if err := adagio.GraphFrom(run).WalkFrom(node, func(gnode graph.Node) error {
 		var (
 			node, _ = gnode.(*adagio.Node)
 			err     error
 		)
 
-		cmps, ops, err = r.complete(ctxt, run.Id, node, &adagio.Result{}, cmps, ops)
+		// complete outgoing nodes with nil result to signify
+		// no attempt has been made
+		cmps, ops, err = r.complete(ctxt, run.Id, node, nil, cmps, ops)
 		if err != nil {
 			return err
 		}
@@ -468,18 +472,17 @@ func (r *Repository) setInputs(ctxt context.Context, run *adagio.Run, node *adag
 	for ini := range incoming {
 		in := ini.(*adagio.Node)
 
-		resp, err := r.kv.Get(ctxt, r.ns.output(run.Id, in.Spec.Name))
-		if err != nil {
-			return err
-		}
+		adagio.VisitLatestAttempt(in, func(result *adagio.Node_Result) {
+			if result.Conclusion != adagio.Node_Result_SUCCESS {
+				return
+			}
 
-		if len(resp.Kvs) > 0 {
 			if node.Inputs == nil {
 				node.Inputs = map[string][]byte{}
 			}
 
-			node.Inputs[in.Spec.Name] = resp.Kvs[0].Value
-		}
+			node.Inputs[in.Spec.Name] = result.Output
+		})
 	}
 
 	return nil
