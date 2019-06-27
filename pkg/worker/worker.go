@@ -103,8 +103,7 @@ func (p *Pool) handleEvent(event *adagio.Event) error {
 
 	result, err := runtime.Run(node)
 	if err != nil {
-		// TODO implement retry behavior
-		return err
+		result.Conclusion = adagio.Conclusion_ERROR
 	}
 
 	if err := p.repo.FinishNode(event.RunID, event.NodeSpec.Name, result); err != nil {
