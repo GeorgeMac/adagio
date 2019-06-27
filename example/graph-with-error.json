@@ -1,0 +1,45 @@
+{
+  "nodes":[
+    {
+      "name":    "a",
+      "runtime": "echo"
+    },
+    {
+      "name":    "b",
+      "runtime": "echo"
+    },
+    {
+      "name":    "c",
+      "runtime": "echo"
+    },
+    {
+      "name":    "d",
+      "runtime": "error"
+    },
+    {
+      "name":    "e",
+      "runtime": "echo"
+    },
+    {
+      "name":    "f",
+      "runtime": "echo"
+    },
+    {
+      "name":    "g",
+      "runtime": "exec",
+      "metadata": {
+        "adagio.runtime.exec.command": {"values": ["ls"]}
+      }
+    }
+  ],
+  "edges":[
+    {"source":"a","destination":"c"},
+    {"source":"a","destination":"d"},
+    {"source":"b","destination":"d"},
+    {"source":"b","destination":"f"},
+    {"source":"c","destination":"e"},
+    {"source":"d","destination":"e"},
+    {"source":"e","destination":"g"},
+    {"source":"f","destination":"g"}
+  ]
+}

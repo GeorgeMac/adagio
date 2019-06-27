@@ -3,6 +3,7 @@ package printing
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -41,6 +42,7 @@ func PBRunToRun(pbrun *adagio.Run) (Run, error) {
 
 	for _, node := range pbrun.Nodes {
 		var (
+			conclusion    adagio.Node_Result_Conclusion
 			startedAt, _  = time.Parse(time.RFC3339, node.StartedAt)
 			finishedAt, _ = time.Parse(time.RFC3339, node.FinishedAt)
 			status, err   = statusToString(node.Status)
@@ -49,10 +51,9 @@ func PBRunToRun(pbrun *adagio.Run) (Run, error) {
 			return Run{}, err
 		}
 
-		conclusion, err := conclusionToString(node.Conclusion)
-		if err != nil {
-			return Run{}, err
-		}
+		adagio.VisitLatestAttempt(node, func(result *adagio.Node_Result) {
+			conclusion = result.Conclusion
+		})
 
 		var metadata map[string][]string
 		if len(node.Spec.Metadata) > 0 {
@@ -74,7 +75,7 @@ func PBRunToRun(pbrun *adagio.Run) (Run, error) {
 			Runtime:    node.Spec.Runtime,
 			Metadata:   metadata,
 			Status:     status,
-			Conclusion: conclusion,
+			Conclusion: conclusionToString(conclusion),
 			StartedAt:  startedAt,
 			FinishedAt: finishedAt,
 		})
@@ -116,17 +117,6 @@ func statusToString(state adagio.Node_Status) (string, error) {
 	}
 }
 
-func conclusionToString(conclusion adagio.Conclusion) (string, error) {
-	switch conclusion {
-	case adagio.Conclusion_NONE:
-		return "none", nil
-	case adagio.Conclusion_SUCCESS:
-		return "success", nil
-	case adagio.Conclusion_FAIL:
-		return "fail", nil
-	case adagio.Conclusion_ERROR:
-		return "error", nil
-	default:
-		return "", errors.New("conclusion not recognized")
-	}
+func conclusionToString(conclusion adagio.Node_Result_Conclusion) string {
+	return strings.ToLower(conclusion.String())
 }

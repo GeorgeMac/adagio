@@ -161,7 +161,7 @@ func (r *Repository) notifyListeners(run *adagio.Run, node *adagio.Node, from, t
 	}
 }
 
-func (r *Repository) FinishNode(runID, name string, result *adagio.Result) error {
+func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -176,8 +176,8 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Result) error
 	}
 
 	node.Status = adagio.Node_COMPLETED
-	node.Conclusion = result.Conclusion
 	node.FinishedAt = r.now().Format(time.RFC3339)
+	node.Attempts = append(node.Attempts, result)
 
 	r.notifyListeners(state.run, node, adagio.Node_RUNNING, adagio.Node_COMPLETED)
 
@@ -186,14 +186,14 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Result) error
 		return errors.Wrapf(err, "finishing node %q", node)
 	}
 
-	if result.Conclusion == adagio.Conclusion_SUCCESS {
+	if result.Conclusion == adagio.Node_Result_SUCCESS {
 		return r.handleSuccess(state, node, outgoing, result)
 	}
 
 	return r.handleFailure(state, node, outgoing, result)
 }
 
-func (r *Repository) handleSuccess(state runState, node *adagio.Node, outgoing map[graph.Node]struct{}, result *adagio.Result) error {
+func (r *Repository) handleSuccess(state runState, node *adagio.Node, outgoing map[graph.Node]struct{}, result *adagio.Node_Result) error {
 	for outi := range outgoing {
 		out := outi.(*adagio.Node)
 
@@ -231,7 +231,7 @@ func (r *Repository) handleSuccess(state runState, node *adagio.Node, outgoing m
 	return nil
 }
 
-func (r *Repository) handleFailure(state runState, node *adagio.Node, src map[graph.Node]struct{}, result *adagio.Result) error {
+func (r *Repository) handleFailure(state runState, node *adagio.Node, src map[graph.Node]struct{}, result *adagio.Node_Result) error {
 	for outi := range src {
 		out := outi.(*adagio.Node)
 

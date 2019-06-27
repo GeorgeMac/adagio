@@ -37,13 +37,6 @@ message MetadataValue {
   repeated string values = 1;
 }
 
-enum Conclusion {
-  NONE = 0;
-  SUCCESS = 1;
-  FAIL = 2;
-  ERROR = 3;
-}
-
 message Node {
   message Spec {
     string name = 1;
@@ -58,9 +51,22 @@ message Node {
     COMPLETED = 3;
   }
 
+  message Result {
+    enum Conclusion {
+      NONE = 0;
+      SUCCESS = 1;
+      FAIL = 2;
+      ERROR = 3;
+    }
+
+    Conclusion conclusion = 1;
+    map<string, MetadataValue> metadata = 2;
+    bytes output = 3;
+  }
+
   Spec spec = 1;
   Status status = 2;
-  Conclusion conclusion = 3;
+  repeated Result attempts = 3;
   string started_at = 4;
   string finished_at = 5;
   map<string, bytes> inputs = 6;
@@ -72,6 +78,12 @@ message Edge {
 }
 
 message Result {
+  enum Conclusion {
+    NONE = 0;
+    SUCCESS = 1;
+    FAIL = 2;
+  }
+
   Conclusion conclusion = 1;
   map<string, MetadataValue> metadata = 2;
   bytes output = 3;
