@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -148,11 +149,14 @@ func agent(ctxt context.Context, repo worker.Repository) {
 			"echo": worker.RuntimeFunc(func(node *adagio.Node) (*adagio.Result, error) {
 				return &adagio.Result{
 					Conclusion: adagio.Conclusion_SUCCESS,
-					Output:     []byte(fmt.Sprintf("got node %s\n", node)),
+					Output:     []byte(node.Spec.Name),
 				}, nil
 			}),
 			"fail": worker.RuntimeFunc(func(node *adagio.Node) (*adagio.Result, error) {
 				return &adagio.Result{Conclusion: adagio.Conclusion_FAIL}, nil
+			}),
+			"error": worker.RuntimeFunc(func(node *adagio.Node) (*adagio.Result, error) {
+				return &adagio.Result{}, errors.New("something went wrong")
 			}),
 			"exec": exec.New(),
 		}
