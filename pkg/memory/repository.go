@@ -2,7 +2,6 @@ package memory
 
 import (
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -233,31 +232,18 @@ func (r *Repository) handleSuccess(state runState, node *adagio.Node, outgoing m
 }
 
 func (r *Repository) handleFailure(state runState, node *adagio.Node, src map[graph.Node]struct{}, result *adagio.Node_Result) error {
-	// check for retries
-	retryKey := strings.ToLower(result.Conclusion.String())
-	if retry, ok := node.Spec.Retry[retryKey]; ok {
-		var retryCount int32
+	if adagio.CanRetry(node) {
+		// put node back into the ready state to be attempted again
+		node.Status = adagio.Node_READY
+		node.FinishedAt = ""
 
-		// count number of existing attempts
-		for _, r := range node.Attempts {
-			if r.Conclusion == result.Conclusion {
-				retryCount++
-			}
-		}
+		r.notifyListeners(state.run, node, adagio.Node_RUNNING, adagio.Node_READY)
 
-		// given we still have attempts remaining
-		if retryCount < retry.MaxAttempts {
-			// put node back into the ready state to be attempted again
-			node.Status = adagio.Node_READY
-			node.FinishedAt = ""
-
-			r.notifyListeners(state.run, node, adagio.Node_RUNNING, adagio.Node_READY)
-
-			return nil
-		}
+		return nil
 	}
 
-	// no attempts remaining so progress outgoing nodes into completed but inconcluded state
+	// no attempts remaining so progress outgoing nodes into
+	// completed but inconcluded state
 	for outi := range src {
 		out := outi.(*adagio.Node)
 
