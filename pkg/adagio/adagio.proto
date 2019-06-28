@@ -39,9 +39,14 @@ message MetadataValue {
 
 message Node {
   message Spec {
+    message Retry {
+      int32  max_attempts = 1;
+    }
+
     string name = 1;
     string runtime = 2;
     map<string, MetadataValue> metadata = 3;
+    map<string, Retry> retry = 4;
   }
   
   enum Status {

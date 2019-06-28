@@ -232,6 +232,18 @@ func (r *Repository) handleSuccess(state runState, node *adagio.Node, outgoing m
 }
 
 func (r *Repository) handleFailure(state runState, node *adagio.Node, src map[graph.Node]struct{}, result *adagio.Node_Result) error {
+	if adagio.CanRetry(node) {
+		// put node back into the ready state to be attempted again
+		node.Status = adagio.Node_READY
+		node.FinishedAt = ""
+
+		r.notifyListeners(state.run, node, adagio.Node_RUNNING, adagio.Node_READY)
+
+		return nil
+	}
+
+	// no attempts remaining so progress outgoing nodes into
+	// completed but inconcluded state
 	for outi := range src {
 		out := outi.(*adagio.Node)
 

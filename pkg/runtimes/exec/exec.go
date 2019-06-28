@@ -41,6 +41,7 @@ func (r *Runtime) Run(n *adagio.Node) (*adagio.Result, error) {
 	}
 
 	return &adagio.Result{
-		Output: data,
+		Conclusion: adagio.Result_SUCCESS,
+		Output:     data,
 	}, nil
 }

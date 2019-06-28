@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
@@ -151,6 +152,13 @@ func agent(ctxt context.Context, repo worker.Repository) {
 					Conclusion: adagio.Result_SUCCESS,
 					Output:     []byte(node.Spec.Name),
 				}, nil
+			}),
+			"flakey": worker.RuntimeFunc(func(node *adagio.Node) (*adagio.Result, error) {
+				if rand.Intn(2) > 0 {
+					return &adagio.Result{Conclusion: adagio.Result_FAIL}, nil
+				}
+
+				return &adagio.Result{Conclusion: adagio.Result_SUCCESS}, nil
 			}),
 			"fail": worker.RuntimeFunc(func(node *adagio.Node) (*adagio.Result, error) {
 				return &adagio.Result{Conclusion: adagio.Result_FAIL}, nil

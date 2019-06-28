@@ -12,12 +12,17 @@ import (
 )
 
 type (
+	Result struct {
+		Conclusion string
+		Output     string
+	}
+
 	Node struct {
 		Name       string
 		Runtime    string
 		Metadata   map[string][]string
 		Status     string
-		Conclusion string
+		Attempts   []Result
 		StartedAt  time.Time
 		FinishedAt time.Time
 	}
@@ -42,7 +47,7 @@ func PBRunToRun(pbrun *adagio.Run) (Run, error) {
 
 	for _, node := range pbrun.Nodes {
 		var (
-			conclusion    adagio.Node_Result_Conclusion
+			attempts      []Result
 			startedAt, _  = time.Parse(time.RFC3339, node.StartedAt)
 			finishedAt, _ = time.Parse(time.RFC3339, node.FinishedAt)
 			status, err   = statusToString(node.Status)
@@ -51,23 +56,22 @@ func PBRunToRun(pbrun *adagio.Run) (Run, error) {
 			return Run{}, err
 		}
 
-		adagio.VisitLatestAttempt(node, func(result *adagio.Node_Result) {
-			conclusion = result.Conclusion
-		})
+		for _, result := range node.Attempts {
+			attempts = append(attempts, Result{
+				Conclusion: conclusionToString(result.Conclusion),
+				Output:     string(result.Output),
+			})
+		}
 
-		var metadata map[string][]string
-		if len(node.Spec.Metadata) > 0 {
-			metadata = map[string][]string{}
+		metadata := map[string][]string{}
+		for k, v := range node.Spec.Metadata {
+			var values []string
 
-			for k, v := range node.Spec.Metadata {
-				var values []string
-
-				for _, value := range v.Values {
-					values = append(values, value)
-				}
-
-				metadata[k] = values
+			for _, value := range v.Values {
+				values = append(values, value)
 			}
+
+			metadata[k] = values
 		}
 
 		run.Nodes = append(run.Nodes, Node{
@@ -75,7 +79,7 @@ func PBRunToRun(pbrun *adagio.Run) (Run, error) {
 			Runtime:    node.Spec.Runtime,
 			Metadata:   metadata,
 			Status:     status,
-			Conclusion: conclusionToString(conclusion),
+			Attempts:   attempts,
 			StartedAt:  startedAt,
 			FinishedAt: finishedAt,
 		})
