@@ -26,7 +26,19 @@ var (
 	f = &adagio.Node_Spec{Name: "f"}
 	g = &adagio.Node_Spec{Name: "g"}
 
-	h = &adagio.Node_Spec{Name: "h", Retry: map[string]*adagio.Node_Spec_Retry{"error": {MaxAttempts: 2}}}
+	h = &adagio.Node_Spec{
+		Name: "h",
+		Retry: map[string]*adagio.Node_Spec_Retry{
+			"error": {MaxAttempts: 2},
+		},
+	}
+
+	i = &adagio.Node_Spec{
+		Name: "i",
+		Retry: map[string]*adagio.Node_Spec_Retry{
+			"fail": {MaxAttempts: 2},
+		},
+	}
 
 	when = time.Date(2019, 5, 24, 8, 2, 0, 0, time.UTC)
 
@@ -101,13 +113,13 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"b": adagio.Node_Result_SUCCESS,
 				},
 				Events: []*adagio.Event{
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "a"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "a"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "b"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "b"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "c"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "d"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "f"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: a, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: a, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: b, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: b, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: d, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: f, Type: adagio.Event_STATE_TRANSITION},
 				},
 				RunStatus: adagio.Run_RUNNING,
 			},
@@ -141,13 +153,13 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"f": adagio.Node_Result_SUCCESS,
 				},
 				Events: []*adagio.Event{
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "c"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "c"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "d"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "d"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "e"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "f"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "f"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: d, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: d, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: e, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: f, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: f, Type: adagio.Event_STATE_TRANSITION},
 				},
 				RunStatus: adagio.Run_RUNNING,
 			},
@@ -173,9 +185,9 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"e": adagio.Node_Result_SUCCESS,
 				},
 				Events: []*adagio.Event{
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "e"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "e"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "g"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: e, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: e, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: g, Type: adagio.Event_STATE_TRANSITION},
 				},
 				RunStatus: adagio.Run_RUNNING,
 			},
@@ -197,8 +209,8 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					}),
 				},
 				Events: []*adagio.Event{
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "g"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "g"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: g, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: g, Type: adagio.Event_STATE_TRANSITION},
 				},
 				Finish: map[string]adagio.Node_Result_Conclusion{
 					"g": adagio.Node_Result_SUCCESS,
@@ -270,13 +282,13 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"b": adagio.Node_Result_SUCCESS,
 				},
 				Events: []*adagio.Event{
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "a"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "a"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "b"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "b"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "c"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "d"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "f"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: a, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: a, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: b, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: b, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: d, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: f, Type: adagio.Event_STATE_TRANSITION},
 				},
 				RunStatus: adagio.Run_RUNNING,
 			},
@@ -310,14 +322,14 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"f": adagio.Node_Result_SUCCESS,
 				},
 				Events: []*adagio.Event{
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "c"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "c"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "d"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "d"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "e"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "f"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "f"}, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "g"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: d, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: d, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: e, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: f, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: f, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: g, Type: adagio.Event_STATE_TRANSITION},
 				},
 				RunStatus: adagio.Run_COMPLETED,
 			},
@@ -500,6 +512,128 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"a": []byte("a"),
 				}, errorResult("h"), success("h")),
 			}, runs[2].Nodes)
+		})
+	})
+
+	t.Run("a run with exhausted retries", func(t *testing.T) {
+		// (a) --> (i) --> (c)
+		//                  ^
+		//                 /
+		//         (b) ----
+		run, err := repo.StartRun(&adagio.GraphSpec{
+			Nodes: []*adagio.Node_Spec{
+				a,
+				b,
+				c,
+				i,
+			},
+			Edges: []*adagio.Edge{
+				{Source: a.Name, Destination: i.Name},
+				{Source: b.Name, Destination: c.Name},
+				{Source: i.Name, Destination: c.Name},
+			},
+		})
+		require.Nil(t, err)
+		require.NotNil(t, run)
+
+		assert.Equal(t, adagio.Run_WAITING, run.Status)
+
+		for _, layer := range []TestLayer{
+			{
+				// (›) --> (i) --> (c)
+				//                  ^
+				//                 /
+				//         (›) ----
+				Name:        "input layer",
+				Repository:  repo,
+				Run:         run,
+				Unclaimable: []string{"c", "i"},
+				Claimable: map[string]*adagio.Node{
+					"a": running(a, nil),
+					"b": running(b, nil),
+				},
+				Finish: map[string]adagio.Node_Result_Conclusion{
+					"a": adagio.Node_Result_SUCCESS,
+					"b": adagio.Node_Result_SUCCESS,
+				},
+				Events: []*adagio.Event{
+					{RunID: run.Id, NodeSpec: a, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: a, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: b, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: b, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: i, Type: adagio.Event_STATE_TRANSITION},
+				},
+				RunStatus: adagio.Run_RUNNING,
+			},
+			{
+				// (›) --> (›) --> (c)
+				//                  ^
+				//                 /
+				//         (›) ----
+				Name:        "retriable fail layer",
+				Repository:  repo,
+				Run:         run,
+				Unclaimable: []string{"c"},
+				Claimable: map[string]*adagio.Node{
+					"i": running(i, map[string][]byte{
+						"a": []byte("a"),
+					}),
+				},
+				Finish: map[string]adagio.Node_Result_Conclusion{
+					"i": adagio.Node_Result_FAIL,
+				},
+				Events: []*adagio.Event{
+					{RunID: run.Id, NodeSpec: i, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: i, Type: adagio.Event_STATE_TRANSITION},
+				},
+				RunStatus: adagio.Run_RUNNING,
+			},
+			{
+				// (›) --> (✗) --> (.)
+				//                  ^
+				//                 /
+				//         (›) ----
+				Name:        "second retriable fail layer",
+				Repository:  repo,
+				Run:         run,
+				Unclaimable: []string{"c"},
+				Claimable: map[string]*adagio.Node{
+					"i": running(i, map[string][]byte{
+						"a": []byte("a"),
+					}, fail("i")),
+				},
+				Finish: map[string]adagio.Node_Result_Conclusion{
+					"i": adagio.Node_Result_FAIL,
+				},
+				Events: []*adagio.Event{
+					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: i, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: i, Type: adagio.Event_STATE_TRANSITION},
+				},
+				RunStatus: adagio.Run_COMPLETED,
+			},
+		} {
+			layer.Exec(t)
+		}
+
+		t.Run("the run is listed", func(t *testing.T) {
+			runs, err := repo.ListRuns()
+			require.Nil(t, err)
+
+			// the run is listed
+			assert.Len(t, runs, 4)
+			assert.Equal(t, run.Id, runs[3].Id)
+
+			assert.Equal(t, []*adagio.Node{
+				completed(a, nil, success("a")),
+				completed(b, nil, success("b")),
+				completed(c, map[string][]byte{
+					"b": []byte("b"),
+				}),
+				completed(i, map[string][]byte{
+					"a": []byte("a"),
+				}, fail("i"), fail("i")),
+			}, runs[3].Nodes)
 		})
 	})
 }
