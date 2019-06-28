@@ -14,7 +14,10 @@
     },
     {
       "name":    "d",
-      "runtime": "echo"
+      "runtime": "flakey",
+      "retry": {
+        "fail": {"max_attempts": 3}
+      }
     },
     {
       "name":    "e",

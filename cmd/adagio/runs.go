@@ -55,6 +55,7 @@ func runs(ctxt context.Context, client controlplane.ControlPlane, args []string)
 func start(ctxt context.Context, client controlplane.ControlPlane, args ...string) {
 	var (
 		fs = flag.NewFlagSet(args[0], flag.ExitOnError)
+		q  = fs.Bool("q", false, "just print the run ID")
 		_  = fs.Bool("help", false, "print usage")
 	)
 
@@ -74,10 +75,10 @@ func start(ctxt context.Context, client controlplane.ControlPlane, args ...strin
 		input io.Reader
 	)
 
-	if len(os.Args) < 4 {
+	if fs.NArg() < 1 {
 		input = os.Stdin
 	} else {
-		fi, err := os.Open(os.Args[3])
+		fi, err := os.Open(fs.Arg(0))
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -92,6 +93,11 @@ func start(ctxt context.Context, client controlplane.ControlPlane, args ...strin
 
 	resp, err := client.Start(context.Background(), req)
 	exitIfError(err)
+
+	if *q {
+		fmt.Print(resp.Run.Id)
+		return
+	}
 
 	fmt.Printf("Run started %q\n", resp.Run.Id)
 }
