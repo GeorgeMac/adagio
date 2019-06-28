@@ -14,7 +14,10 @@
     },
     {
       "name":    "d",
-      "runtime": "echo"
+      "runtime": "echo",
+      "retry": [
+        {"type": "error", "max_attempts": 3}
+      ]
     },
     {
       "name":    "e",

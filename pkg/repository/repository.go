@@ -26,6 +26,8 @@ var (
 	f = &adagio.Node_Spec{Name: "f"}
 	g = &adagio.Node_Spec{Name: "g"}
 
+	h = &adagio.Node_Spec{Name: "h", Retry: []*adagio.Node_Spec_Retry{{Type: "error", MaxAttempts: 2}}}
+
 	when = time.Date(2019, 5, 24, 8, 2, 0, 0, time.UTC)
 
 	ExampleGraph = &adagio.GraphSpec{
@@ -239,7 +241,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 		})
 	})
 
-	t.Run("a second run is created", func(t *testing.T) {
+	t.Run("a run with a failure", func(t *testing.T) {
 		run, err := repo.StartRun(ExampleGraph)
 		require.Nil(t, err)
 		require.NotNil(t, run)
@@ -349,6 +351,146 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				}),
 				completed(g, nil, map[string][]byte{
 					"f": []byte("f"),
+				}),
+			}, runs[1].Nodes)
+		})
+	})
+
+	t.Run("a run with retries", func(t *testing.T) {
+		// (a) --> (h) --> (c)
+		//                  ^
+		//                 /
+		//         (b) ----
+		run, err := repo.StartRun(&adagio.GraphSpec{
+			Nodes: []*adagio.Node_Spec{
+				a,
+				b,
+				c,
+				h,
+			},
+			Edges: []*adagio.Edge{
+				{Source: a.Name, Destination: h.Name},
+				{Source: b.Name, Destination: c.Name},
+				{Source: h.Name, Destination: c.Name},
+			},
+		})
+		require.Nil(t, err)
+		require.NotNil(t, run)
+
+		assert.Equal(t, adagio.Run_WAITING, run.Status)
+
+		for _, layer := range []TestLayer{
+			{
+				// (›) --> (h) --> (c)
+				//                  ^
+				//                 /
+				//         (›) ----
+				Name:        "input layer",
+				Repository:  repo,
+				Run:         run,
+				Unclaimable: []string{"c", "h"},
+				Claimable: map[string]*adagio.Node{
+					"a": running(a, nil),
+					"b": running(b, nil),
+				},
+				Finish: map[string]adagio.Node_Result_Conclusion{
+					"a": adagio.Node_Result_SUCCESS,
+					"b": adagio.Node_Result_SUCCESS,
+				},
+				Events: []*adagio.Event{
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "a"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "a"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "b"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "b"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "h"}, Type: adagio.Event_STATE_TRANSITION},
+				},
+				RunStatus: adagio.Run_RUNNING,
+			},
+			{
+				// (›) --> (›) --> (c)
+				//                  ^
+				//                 /
+				//         (›) ----
+				Name:        "retriable error layer",
+				Repository:  repo,
+				Run:         run,
+				Unclaimable: []string{"c"},
+				Claimable: map[string]*adagio.Node{
+					"h": running(h, nil),
+				},
+				Finish: map[string]adagio.Node_Result_Conclusion{
+					"h": adagio.Node_Result_ERROR,
+				},
+				Events: []*adagio.Event{
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "h"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "h"}, Type: adagio.Event_STATE_TRANSITION},
+				},
+				RunStatus: adagio.Run_RUNNING,
+			},
+			{
+				// (✓) --> (!) --> (c)
+				//                  ^
+				//                 /
+				//         (✓) ----
+				Name:        "successful second attempt layer",
+				Repository:  repo,
+				Run:         run,
+				Unclaimable: []string{"c"},
+				Claimable: map[string]*adagio.Node{
+					"h": running(h, nil),
+				},
+				Finish: map[string]adagio.Node_Result_Conclusion{
+					"h": adagio.Node_Result_SUCCESS,
+				},
+				Events: []*adagio.Event{
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "h"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "h"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "c"}, Type: adagio.Event_STATE_TRANSITION},
+				},
+				RunStatus: adagio.Run_RUNNING,
+			},
+			{
+				// (✓) --> (✓) --> (›)
+				//                  ^
+				//                 /
+				//         (✓) ----
+				Name:        "final layer",
+				Repository:  repo,
+				Run:         run,
+				Unclaimable: []string{},
+				Claimable: map[string]*adagio.Node{
+					"c": running(c, nil),
+				},
+				Finish: map[string]adagio.Node_Result_Conclusion{
+					"c": adagio.Node_Result_SUCCESS,
+				},
+				Events: []*adagio.Event{
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "c"}, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: &adagio.Node_Spec{Name: "c"}, Type: adagio.Event_STATE_TRANSITION},
+				},
+				RunStatus: adagio.Run_COMPLETED,
+			},
+		} {
+			layer.Exec(t)
+		}
+
+		t.Run("the run is listed", func(t *testing.T) {
+			runs, err := repo.ListRuns()
+			require.Nil(t, err)
+
+			// the run is listed
+			assert.Len(t, runs, 3)
+			assert.Equal(t, run.Id, runs[2].Id)
+
+			assert.Equal(t, []*adagio.Node{
+				completed(a, success("a"), nil),
+				completed(b, success("b"), nil),
+				completed(d, fail("c"), map[string][]byte{
+					"c": []byte("c"),
+					"h": []byte("h"),
+				}),
+				completed(c, success("h"), map[string][]byte{
+					"a": []byte("a"),
 				}),
 			}, runs[1].Nodes)
 		})
