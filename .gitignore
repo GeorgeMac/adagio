@@ -1,5 +1,5 @@
 *.swo
 *.swp
-*.svg
+/*.svg
 *.png
 default.etcd/
