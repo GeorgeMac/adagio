@@ -3,3 +3,4 @@
 /*.svg
 *.png
 default.etcd/
+bin/*

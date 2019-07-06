@@ -98,8 +98,11 @@ func (p *Pool) handleEvent(event *adagio.Event) error {
 	}
 
 	if !claimed {
-		return errors.New("node already claimed")
+		// node already claimed by other consumer
+		return nil
 	}
+
+	log.Printf("claimed run %q node %q\n", event.RunID, event.NodeSpec.Name)
 
 	result, err := runtime.Run(node)
 	nodeResult := &adagio.Node_Result{
