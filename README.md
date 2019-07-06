@@ -3,6 +3,8 @@ Adagio - The Workflow Engine
 
 [![CircleCI](https://circleci.com/gh/GeorgeMac/adagio.svg?style=svg)](https://circleci.com/gh/GeorgeMac/adagio)
 
+![architecture](docs/architecture.svg)
+
 > This project is currently in a constant state of flux. Don't expect it to work. Thank you o/
 
 Adagio is a workflow execution tool designed to run both locally and facilitate execution across a cluster of worker nodes.

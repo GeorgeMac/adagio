@@ -1,0 +1,75 @@
+digraph architecture {
+  compound=true;
+  rankdir=LR;
+  fontsize=10;
+
+  subgraph cluster_spec {
+    label="adagio runs start <graph_specification>";
+    node [fontsize=10, width=0.3, height=0.3, fixedsize=true];
+    a -> c;
+    a -> d;
+    b -> d;
+    b -> f;
+    c -> e;
+    d -> e;
+    e -> g;
+    f -> g;
+  }
+
+  subgraph cluster_output_spec {
+    label="adagio runs inspect -printer dot <run_id>";
+    node [fontsize=10, width=0.3, height=0.3, fixedsize=true];
+
+    a2 [label="a", style=filled, fillcolor=green];
+    b2 [label="b", style=filled, fillcolor=green];
+    c2 [label="c", style=filled, fillcolor=green];
+    d2 [label="d", style=filled, fillcolor=red];
+    e2 [label="e"];
+    f2 [label="f", style=filled, fillcolor=green];
+    g2 [label="g"];
+
+    a2 -> c2;
+    a2 -> d2;
+    b2 -> d2;
+    b2 -> f2;
+    c2 -> e2;
+    d2 -> e2;
+    e2 -> g2;
+    f2 -> g2;
+  }
+
+  subgraph cluster_etcd {
+    node [shape=cylinder, style=filled, fillcolor=lightgrey];
+    edge [dir=both, minlen=2];
+
+    etcd0 -> etcd1;
+    etcd0 -> etcd2 [constraint=false];
+    etcd1 -> etcd2 [constraint=false];
+  }
+
+  subgraph adagiod_api {
+    api0 [label="adagiod api", shape=box];
+    api1 [label="adagiod api", shape=box];
+    gateway [shape=box, height=2, width=0.3, label=lb];
+
+    api0 -> etcd0;
+    api1 -> etcd0;
+  }
+
+  subgraph adagiod_agent {
+    edge [dir=back];
+
+    agent0 [label="adagiod agent", shape=box];
+    agent1 [label="adagiod agent", shape=box];
+    agent2 [label="adagiod agent", shape=box];
+
+    etcd1 -> agent0;
+    etcd1 -> agent1;
+    etcd1 -> agent2;
+  }
+
+  g -> gateway [ltail=cluster_spec];
+  g2 -> gateway [ltail=cluster_output_spec, dir=back];
+  gateway -> api0;
+  gateway -> api1;
+}
