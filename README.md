@@ -1,5 +1,5 @@
-Adagio - The Workflow Engine
-----------------------------
+Adagio - A Workflow Orchestrator
+----------------------------------
 
 [![CircleCI](https://circleci.com/gh/GeorgeMac/adagio.svg?style=svg)](https://circleci.com/gh/GeorgeMac/adagio)
 
