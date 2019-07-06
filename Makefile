@@ -2,6 +2,12 @@
 install: ## Install adagio and adagiod
 	go install -mod=vendor ./...
 
+.PHONY: build
+build: ## Build adagio and adagiod into local bin dir
+	@mkdir -p bin/
+	go build -mod=vendor -o bin/adagio  cmd/adagio/*.go
+	go build -mod=vendor -o bin/adagiod cmd/adagiod/*.go
+
 .PHONY: test
 test: ## Run test suite
 	go test -cover -race -mod=vendor ./...
@@ -22,6 +28,10 @@ protobuf: protobuf-deps ## Build protocol buffers into twirp model and service d
 protobuf-deps: ## Fetch protobuf dependencies
 	@go get github.com/twitchtv/twirp/protoc-gen-twirp
 	@go get github.com/golang/protobuf/protoc-gen-go
+
+.PHONY: docker-build
+docker-build: ## Build docker images
+	docker build -t georgemac/adagio:`git describe --always --dirty` -f docker/Dockerfile .
 
 # Absolutely awesome: http://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
 .PHONY: help

@@ -1,0 +1,41 @@
+version: '2'
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command:
+      - adagiod
+      - -backend-type=etcd
+      - -etcd-addresses=http://etcd:2379
+      - api
+    ports:
+      - "7890:7890"
+  agent_one:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command:
+      - adagiod
+      - -backend-type=etcd
+      - -etcd-addresses=http://etcd:2379
+      - agent
+  agent_two:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command:
+      - adagiod
+      - -backend-type=etcd
+      - -etcd-addresses=http://etcd:2379
+      - agent
+  etcd:
+    image: gcr.io/etcd-development/etcd:v3.3
+    command:
+      - /usr/local/bin/etcd
+      - -name=etcd1
+      - -advertise-client-urls=http://0.0.0.0:2379
+      - -initial-advertise-peer-urls=http://0.0.0.0:2380
+      - -listen-client-urls=http://0.0.0.0:2379
+      - -listen-peer-urls=http://0.0.0.0:2380
+      - -initial-cluster=etcd1=http://0.0.0.0:2380
