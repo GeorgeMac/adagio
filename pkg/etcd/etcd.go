@@ -567,10 +567,6 @@ func (n namespace) nodeInStateKey(runID, state, name string) string {
 	return fmt.Sprintf("%sstates/%s/run/%s/node/%s", n, state, runID, name)
 }
 
-func (n namespace) output(runID, node string) string {
-	return fmt.Sprintf("%sruns/%s/node/%s/output", n, runID, node)
-}
-
 func (n namespace) stripBytes(key []byte) string {
 	return strings.TrimPrefix(string(key), string(n))
 }
