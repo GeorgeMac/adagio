@@ -8,8 +8,9 @@
 // v0/states/ : states namespace
 //
 // Objects:
-// v0/runs/<run-id>                              : Run{}
-// v0/states/<state>/run/<run-id>/node/<node-id> : Node{}
+// v0/runs/<run-id>                           : Run{}  serialized run object
+// v0/runs/<run-id>/node/<name>               : Node{} serialized node object
+// v0/states/<state>/run/<run-id>/node/<name> : ""     empty string to identify state
 //
 // States: (waiting, ready, running, completed)
 package etcd
