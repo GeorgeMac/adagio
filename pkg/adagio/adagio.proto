@@ -21,6 +21,7 @@ message Run {
 message Event {
   enum Type {
     STATE_TRANSITION = 0;
+    NODE_ORPHANED = 1;
   }
 
   Type      type     = 1;
@@ -50,10 +51,11 @@ message Node {
   }
   
   enum Status {
-    WAITING = 0;
-    READY = 1;
-    RUNNING = 2;
-    COMPLETED = 3;
+    NONE = 0;
+    WAITING = 1;
+    READY = 2;
+    RUNNING = 3;
+    COMPLETED = 4;
   }
 
   message Result {

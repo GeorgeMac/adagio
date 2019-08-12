@@ -70,17 +70,25 @@ type Repository interface {
 	worker.Repository
 }
 
+type Orphaner interface {
+	Orphan(run *adagio.Run, spec *adagio.Node_Spec)
+}
+
+type OrphanFunc func(*adagio.Run, *adagio.Node_Spec)
+
+func (o OrphanFunc) Orphan(r *adagio.Run, s *adagio.Node_Spec) { o(r, s) }
+
 type UnsubscribeRepository interface {
 	Repository
 	UnsubscribeAll(chan<- *adagio.Event) error
 }
 
-type Constructor func(func() time.Time) Repository
+type Constructor func(func() time.Time) (Repository, Orphaner)
 
 func TestHarness(t *testing.T, repoFn Constructor) {
 	t.Helper()
 
-	repo := repoFn(func() time.Time {
+	repo, orphaner := repoFn(func() time.Time {
 		return when
 	})
 
@@ -636,6 +644,84 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 			}, runs[3].Nodes)
 		})
 	})
+
+	t.Run("a run with an orphaned node", func(t *testing.T) {
+		// (a)
+		run, err := repo.StartRun(&adagio.GraphSpec{
+			Nodes: []*adagio.Node_Spec{
+				a,
+			},
+			Edges: []*adagio.Edge{},
+		})
+		require.Nil(t, err)
+		require.NotNil(t, run)
+
+		var (
+			events    = make(chan *adagio.Event, 3)
+			collected = make([]*adagio.Event, 0)
+		)
+
+		err = repo.Subscribe(events, adagio.Event_STATE_TRANSITION, adagio.Event_NODE_ORPHANED)
+		require.Nil(t, err)
+
+		assert.Equal(t, adagio.Run_WAITING, run.Status)
+
+		t.Run("an initial claim is made", func(t *testing.T) {
+			// ensure node can initially be claimed
+			canClaim(t, repo, run, map[string]*adagio.Node{"a": running(a, nil)})
+		})
+
+		// orphan node "a" from run
+		orphaner.Orphan(run, a)
+
+		t.Run("the orphaned node", func(t *testing.T) {
+			// ensure orphaned node can be claimed again and has no results yet
+			canClaim(t, repo, run, map[string]*adagio.Node{"a": running(a, nil)})
+		})
+
+		// can error the node
+		canFinish(t, repo, run, map[string]adagio.Node_Result_Conclusion{"a": adagio.Node_Result_ERROR})
+
+		for i := 0; i < 3; i++ {
+			select {
+			case event := <-events:
+				collected = append(collected, event)
+			case <-time.After(5 * time.Second):
+				t.Error("timeout collecting events")
+				return
+			}
+		}
+
+		sort.SliceStable(collected, func(i, j int) bool {
+			if collected[i].NodeSpec.Name == collected[j].NodeSpec.Name {
+				return collected[i].Type < collected[j].Type
+			}
+
+			return collected[i].NodeSpec.Name < collected[j].NodeSpec.Name
+		})
+
+		expected := []*adagio.Event{
+			{RunID: run.Id, NodeSpec: a, Type: adagio.Event_STATE_TRANSITION},
+			{RunID: run.Id, NodeSpec: a, Type: adagio.Event_STATE_TRANSITION},
+			{RunID: run.Id, NodeSpec: a, Type: adagio.Event_NODE_ORPHANED},
+		}
+		if !assert.Equal(t, expected, collected) {
+			fmt.Println(pretty.Diff(expected, collected))
+		}
+
+		t.Run("the run is listed", func(t *testing.T) {
+			runs, err := repo.ListRuns()
+			require.Nil(t, err)
+
+			// the run is listed
+			assert.Len(t, runs, 5)
+			assert.Equal(t, run.Id, runs[4].Id)
+
+			assert.Equal(t, []*adagio.Node{
+				completed(a, nil, errorResult("a")),
+			}, runs[4].Nodes)
+		})
+	})
 }
 
 type TestLayer struct {
@@ -655,7 +741,7 @@ func (l *TestLayer) Exec(t *testing.T) {
 	var (
 		events    = make(chan *adagio.Event, len(l.Events))
 		collected = make([]*adagio.Event, 0)
-		err       = l.Repository.Subscribe(events, adagio.Node_READY, adagio.Node_RUNNING, adagio.Node_COMPLETED)
+		err       = l.Repository.Subscribe(events, adagio.Event_STATE_TRANSITION)
 	)
 	require.Nil(t, err)
 
