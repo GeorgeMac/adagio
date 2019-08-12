@@ -19,7 +19,7 @@ var ErrRuntimeDoesNotExist = errors.New("runtime does not exist")
 type Repository interface {
 	ClaimNode(runID, name string) (*adagio.Node, bool, error)
 	FinishNode(runID, name string, result *adagio.Node_Result) error
-	Subscribe(events chan<- *adagio.Event, states ...adagio.Node_Status) error
+	Subscribe(events chan<- *adagio.Event, types ...adagio.Event_Type) error
 }
 
 // Runtime is a type which can execute a node and produce a result
@@ -67,7 +67,7 @@ func (p *Pool) Run(ctxt context.Context) {
 		go func() {
 			defer wg.Done()
 			events := make(chan *adagio.Event, 10)
-			p.repo.Subscribe(events, adagio.Node_READY)
+			p.repo.Subscribe(events, adagio.Event_STATE_TRANSITION)
 
 			for {
 				select {

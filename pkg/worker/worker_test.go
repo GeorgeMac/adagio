@@ -58,7 +58,7 @@ func TestPool_HappyPath(t *testing.T) {
 	for _, call := range repo.subscribeCalls {
 		require.NotNil(t, call.events)
 
-		assert.Equal(t, []adagio.Node_Status{adagio.Node_READY}, call.statuses)
+		assert.Equal(t, []adagio.Event_Type{adagio.Event_STATE_TRANSITION}, call.types)
 
 		// feed each subscriber an event for node "foo"
 		call.events <- &adagio.Event{RunID: "bar", NodeSpec: &adagio.Node_Spec{Name: "foo", Runtime: "test"}}
@@ -126,7 +126,7 @@ func TestPool_Error_RuntimeDoesNotExist(t *testing.T) {
 	for _, call := range repo.subscribeCalls {
 		require.NotNil(t, call.events)
 
-		assert.Equal(t, []adagio.Node_Status{adagio.Node_READY}, call.statuses)
+		assert.Equal(t, []adagio.Event_Type{adagio.Event_STATE_TRANSITION}, call.types)
 
 		// feed each subscriber an event for node "foo"
 		call.events <- &adagio.Event{RunID: "bar", NodeSpec: &adagio.Node_Spec{Name: "foo", Runtime: "test"}}
@@ -189,7 +189,7 @@ func TestPool_Error_RuntimeError(t *testing.T) {
 	for _, call := range repo.subscribeCalls {
 		require.NotNil(t, call.events)
 
-		assert.Equal(t, []adagio.Node_Status{adagio.Node_READY}, call.statuses)
+		assert.Equal(t, []adagio.Event_Type{adagio.Event_STATE_TRANSITION}, call.types)
 
 		// feed each subscriber an event for node "foo"
 		call.events <- &adagio.Event{RunID: "bar", NodeSpec: &adagio.Node_Spec{Name: "foo", Runtime: "error"}}

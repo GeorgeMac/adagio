@@ -79,11 +79,11 @@ func (r *repository) FinishNode(runID string, name string, result *adagio.Node_R
 }
 
 type subscribeCall struct {
-	events   chan<- *adagio.Event
-	statuses []adagio.Node_Status
+	events chan<- *adagio.Event
+	types  []adagio.Event_Type
 }
 
-func (r *repository) Subscribe(events chan<- *adagio.Event, statuses ...adagio.Node_Status) error {
+func (r *repository) Subscribe(events chan<- *adagio.Event, types ...adagio.Event_Type) error {
 	r.mu.Lock()
 	defer func() {
 		r.subscriptionCount.Done()
@@ -91,7 +91,7 @@ func (r *repository) Subscribe(events chan<- *adagio.Event, statuses ...adagio.N
 		r.mu.Unlock()
 	}()
 
-	r.subscribeCalls = append(r.subscribeCalls, subscribeCall{events, statuses})
+	r.subscribeCalls = append(r.subscribeCalls, subscribeCall{events, types})
 
 	return nil
 }
