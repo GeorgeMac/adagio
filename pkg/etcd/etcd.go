@@ -23,22 +23,29 @@ var (
 type Repository struct {
 	kv      clientv3.KV
 	watcher clientv3.Watcher
+	leaser  clientv3.Lease
 
 	mu            sync.Mutex
 	subscriptions map[chan<- *adagio.Event]chan struct{}
 
 	ns  namespace
 	now func() time.Time
+
+	ttl    time.Duration
+	leases map[string]func()
 }
 
-func New(kv clientv3.KV, watcher clientv3.Watcher, opts ...Option) *Repository {
+func New(kv clientv3.KV, watcher clientv3.Watcher, leaser clientv3.Lease, opts ...Option) *Repository {
 	r := &Repository{
 		kv:            kv,
 		watcher:       watcher,
+		leaser:        leaser,
 		mu:            sync.Mutex{},
 		subscriptions: map[chan<- *adagio.Event]chan struct{}{},
 		now:           func() time.Time { return time.Now().UTC() },
 		ns:            namespace("v0/"),
+		ttl:           10 * time.Second,
+		leases:        map[string]func(){},
 	}
 
 	Options(opts).Apply(r)
@@ -52,7 +59,7 @@ func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err erro
 		return
 	}
 
-	data, err := marshalRun(run.CreatedAt, run.Edges)
+	data, err := marshalRun(run.CreatedAt, spec.Nodes, run.Edges)
 	if err != nil {
 		return nil, err
 	}
@@ -73,14 +80,9 @@ func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err erro
 			return nil, err
 		}
 
-		state, err := stateToString(node.Status)
-		if err != nil {
-			return nil, err
-		}
-
 		var (
 			key      = r.ns.nodeKey(run.Id, node.Spec.Name)
-			stateKey = r.ns.nodeInStateKey(run.Id, state, node.Spec.Name)
+			stateKey = r.ns.nodeInStateKey(run.Id, statusToString(node.Status), node.Spec.Name)
 			put      = clientv3.OpPut(key, string(nodeData))
 			putState = clientv3.OpPut(stateKey, "")
 		)
@@ -150,7 +152,8 @@ func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
 		return nil, false, adagio.ErrNodeNotReady
 	}
 
-	if node.Status != adagio.Node_READY {
+	// node must be either ready or in none state
+	if node.Status != adagio.Node_READY && node.Status != adagio.Node_NONE {
 		return nil, false, nil
 	}
 
@@ -185,20 +188,12 @@ func (r *Repository) complete(ctxt context.Context, runID string, node *adagio.N
 }
 
 func (r *Repository) transition(ctxt context.Context, runID string, node *adagio.Node, toStatus adagio.Node_Status, cmps []clientv3.Cmp, ops []clientv3.Op) ([]clientv3.Cmp, []clientv3.Op, error) {
-	from, err := stateToString(node.Status)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	to, err := stateToString(toStatus)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	var (
 		nodeKey = r.ns.nodeKey(runID, node.Spec.Name)
-		fromKey = r.ns.nodeInStateKey(runID, from, node.Spec.Name)
-		toKey   = r.ns.nodeInStateKey(runID, to, node.Spec.Name)
+		fromKey = r.ns.nodeInStateKey(runID, statusToString(node.Status), node.Spec.Name)
+		toKey   = r.ns.nodeInStateKey(runID, statusToString(toStatus), node.Spec.Name)
+		from    = node.Status
+		putOpts []clientv3.OpOption
 	)
 
 	node.Status = toStatus
@@ -206,6 +201,14 @@ func (r *Repository) transition(ctxt context.Context, runID string, node *adagio
 	switch toStatus {
 	case adagio.Node_RUNNING:
 		node.StartedAt = r.now().Format(time.RFC3339)
+
+		// construct a lease which is kept-alive
+		leaseID, err := r.lease(toKey)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		putOpts = append(putOpts, clientv3.WithLease(leaseID))
 	case adagio.Node_COMPLETED:
 		now := r.now()
 		if node.StartedAt == "" {
@@ -220,18 +223,109 @@ func (r *Repository) transition(ctxt context.Context, runID string, node *adagio
 		return nil, nil, err
 	}
 
+	if from != adagio.Node_NONE {
+		return append(cmps,
+				// ensure node exists
+				clientv3.Compare(clientv3.Version(nodeKey), ">", 0),
+				// ensure node has not moved into to state yet
+				clientv3.Compare(clientv3.Version(toKey), "=", 0),
+				// ensure node starts in expected state
+				clientv3.Compare(clientv3.Version(fromKey), ">", 0)),
+			append(ops,
+				clientv3.OpPut(nodeKey, string(data)),
+				clientv3.OpDelete(fromKey),
+				clientv3.OpPut(toKey, "", putOpts...),
+			), nil
+	}
+
+	// the following code handles orphaned nodes where
+	// the node is now not in any state
+	statusDoesNotExist := func(status adagio.Node_Status) clientv3.Cmp {
+		statusKey := r.ns.nodeInStateKey(runID, statusToString(status), node.Spec.Name)
+		return clientv3.Compare(clientv3.Version(statusKey), "=", 0)
+	}
+
 	return append(cmps,
 			// ensure node exists
 			clientv3.Compare(clientv3.Version(nodeKey), ">", 0),
-			// ensure node is in from state
-			clientv3.Compare(clientv3.Version(fromKey), ">", 0),
-			// ensure node has not moved into to state yet
-			clientv3.Compare(clientv3.Version(toKey), "=", 0)),
+			// ensure node does not exist in any state
+			statusDoesNotExist(adagio.Node_WAITING),
+			statusDoesNotExist(adagio.Node_READY),
+			statusDoesNotExist(adagio.Node_RUNNING),
+			statusDoesNotExist(adagio.Node_COMPLETED)),
 		append(ops,
 			clientv3.OpPut(nodeKey, string(data)),
-			clientv3.OpDelete(fromKey),
-			clientv3.OpPut(toKey, ""),
+			clientv3.OpPut(toKey, "", putOpts...),
 		), nil
+}
+
+func (r *Repository) lease(forKey string) (clientv3.LeaseID, error) {
+	// store lease keep-alive cancel func
+	r.mu.Lock()
+	var ctxt context.Context
+	ctxt, r.leases[forKey] = context.WithCancel(context.Background())
+	r.mu.Unlock()
+
+	// grant lease in seconds
+	leaseResp, err := r.leaser.Grant(ctxt, int64(r.ttl/time.Second))
+	if err != nil {
+		return 0, err
+	}
+
+	// keep lease alive
+	go func() {
+		defer r.cancelLease(forKey)
+
+		resps, err := r.leaser.KeepAlive(ctxt, leaseResp.ID)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		for resp := range resps {
+			log.Println("keep-alive", resp.ID)
+		}
+
+		log.Println("finished keep-alive for", forKey)
+	}()
+
+	return leaseResp.ID, nil
+}
+
+func (r *Repository) cancelLease(forKey string) {
+	// clear lease keep-alive
+	r.mu.Lock()
+	if cancel, ok := r.leases[forKey]; ok {
+		cancel()
+		delete(r.leases, forKey)
+	}
+	r.mu.Unlock()
+
+	var (
+		ctxt      = context.Background()
+		resp, err = r.kv.Get(ctxt, forKey)
+	)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	if len(resp.Kvs) < 1 {
+		log.Println(forKey, "key not found")
+		return
+	}
+
+	// if it has a lease
+	if resp.Kvs[0].Lease < 1 {
+		log.Println(forKey, "zero lease id")
+		return
+	}
+
+	// revoke lease
+	if _, err := r.leaser.Revoke(ctxt, clientv3.LeaseID(resp.Kvs[0].Lease)); err != nil {
+		log.Println(forKey, err)
+		return
+	}
 }
 
 func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result) error {
@@ -282,6 +376,8 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result) 
 		return r.FinishNode(run.Id, node.Spec.Name, result)
 	}
 
+	r.cancelLease(r.ns.nodeInStateKey(run.Id, "running", node.Spec.Name))
+
 	return nil
 }
 
@@ -324,12 +420,7 @@ func (r *Repository) handleSuccess(ctxt context.Context, run *adagio.Run, node *
 				continue
 			}
 
-			state, err := stateToString(in.Status)
-			if err != nil {
-				return nil, nil, err
-			}
-
-			currentKey := r.ns.nodeInStateKey(run.Id, state, in.Spec.Name)
+			currentKey := r.ns.nodeInStateKey(run.Id, statusToString(in.Status), in.Spec.Name)
 			cmps = append(cmps, clientv3.Compare(clientv3.Version(currentKey), ">", 0))
 		}
 
@@ -378,7 +469,7 @@ func (r *Repository) handleFailure(ctxt context.Context, run *adagio.Run, node *
 	return cmps, ops, nil
 }
 
-func (r *Repository) Subscribe(events chan<- *adagio.Event, s ...adagio.Node_Status) error {
+func (r *Repository) Subscribe(events chan<- *adagio.Event, typ ...adagio.Event_Type) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -411,7 +502,7 @@ func (r *Repository) Subscribe(events chan<- *adagio.Event, s ...adagio.Node_Sta
 
 						run, err := r.getRun(context.Background(), keyParts[3])
 						if err != nil {
-							log.Println(err)
+							log.Println(keyParts[3], err)
 							continue
 						}
 
@@ -421,15 +512,54 @@ func (r *Repository) Subscribe(events chan<- *adagio.Event, s ...adagio.Node_Sta
 							continue
 						}
 
-						state, err := stateFromString(keyParts[1])
+						if types(typ).contains(adagio.Event_STATE_TRANSITION) {
+							events <- &adagio.Event{
+								Type:     adagio.Event_STATE_TRANSITION,
+								RunID:    keyParts[3],
+								NodeSpec: node.Spec,
+							}
+						}
+
+						continue
+					}
+
+					// todo(george): import issues with etcd returning old urls from types
+					// defined in new url scheme makes importing other etcd v3 libs to break
+					// until then I am just going to compare to the literal 1 value which means
+					// DELETE operation
+					if ev.Type == 1 {
+						keyParts := strings.Split(r.ns.stripBytes(ev.Kv.Key), "/")
+						if len(keyParts) < 6 {
+							continue
+						}
+
+						if keyParts[1] != "running" {
+							// ignore non-running deletes
+							continue
+						}
+
+						run, err := r.getRun(context.Background(), keyParts[3])
+						if err != nil {
+							log.Println(keyParts[3], err)
+							continue
+						}
+
+						node, err := run.GetNodeByName(keyParts[5])
 						if err != nil {
 							log.Println(err)
 							continue
 						}
 
-						if states(s).contains(state) {
+						if node.Status != adagio.Node_NONE {
+							// normal node deletion is expected behavior
+							// nodes with NONE status after deletion is
+							// the signal of an orphaning of a node
+							continue
+						}
+
+						if types(typ).contains(adagio.Event_NODE_ORPHANED) {
 							events <- &adagio.Event{
-								Type:     adagio.Event_STATE_TRANSITION,
+								Type:     adagio.Event_NODE_ORPHANED,
 								RunID:    keyParts[3],
 								NodeSpec: node.Spec,
 							}
@@ -457,10 +587,12 @@ func (r *Repository) getRun(ctxt context.Context, id string) (*adagio.Run, error
 		return nil, errors.New("run not found")
 	}
 
+	// initially read out node configuration
 	if err := unmarshalRun(resp.Kvs[0].Value, run); err != nil {
 		return nil, err
 	}
 
+	// re-hydrate current node states
 	if err := r.nodesForRun(ctxt, run); err != nil {
 		return nil, err
 	}
@@ -490,11 +622,18 @@ func (r *Repository) getRun(ctxt context.Context, id string) (*adagio.Run, error
 func (r *Repository) nodesForRun(ctxt context.Context, run *adagio.Run) error {
 	var (
 		prefix    = r.ns.allNodesKey(run)
+		nodes     = map[string]*adagio.Node{}
 		resp, err = r.kv.Get(ctxt, prefix, clientv3.WithPrefix())
 	)
 
 	if err != nil {
 		return err
+	}
+
+	// create mapping for existing nodes in-order
+	// to replace with deserialized ones
+	for _, node := range run.Nodes {
+		nodes[node.Spec.Name] = node
 	}
 
 	for _, kv := range resp.Kvs {
@@ -503,7 +642,22 @@ func (r *Repository) nodesForRun(ctxt context.Context, run *adagio.Run) error {
 			return err
 		}
 
-		run.Nodes = append(run.Nodes, node)
+		// check status key exists at store revision for each node
+		resp, err := r.kv.Get(ctxt, r.ns.nodeInStateKey(run.Id, statusToString(node.Status), node.Spec.Name), clientv3.WithPrefix(), clientv3.WithRev(resp.Header.Revision))
+		if err != nil {
+			return err
+		}
+
+		if len(resp.Kvs) < 1 {
+			// node not found with expected status suggests node
+			// has been orphaned so we mark it with none status
+			node.Status = adagio.Node_NONE
+		}
+
+		if dst, ok := nodes[node.Spec.Name]; ok {
+			// swap existing node with new de-serialized version
+			*dst = *node
+		}
 	}
 
 	for _, node := range run.Nodes {
@@ -585,8 +739,9 @@ func (n namespace) stripBytes(key []byte) string {
 }
 
 type run struct {
-	CreatedAt time.Time      `json:"created_at"`
-	Edges     []*adagio.Edge `json:"edges"`
+	CreatedAt time.Time           `json:"created_at"`
+	Specs     []*adagio.Node_Spec `json:"specs"`
+	Edges     []*adagio.Edge      `json:"edges"`
 }
 
 func unmarshalRun(data []byte, dst *adagio.Run) error {
@@ -598,13 +753,19 @@ func unmarshalRun(data []byte, dst *adagio.Run) error {
 	dst.CreatedAt = run.CreatedAt.Format(time.RFC3339)
 	dst.Edges = run.Edges
 
+	// create an initial specification with zeroed node state
+	// which will be replaced when nodes fetched and de-serialized
+	for _, spec := range run.Specs {
+		dst.Nodes = append(dst.Nodes, &adagio.Node{Spec: spec})
+	}
+
 	return nil
 }
 
-func marshalRun(createdAt string, edges []*adagio.Edge) ([]byte, error) {
+func marshalRun(createdAt string, spec []*adagio.Node_Spec, edges []*adagio.Edge) ([]byte, error) {
 	var (
 		createdAtT, err = time.Parse(time.RFC3339, createdAt)
-		run             = run{createdAtT, edges}
+		run             = run{createdAtT, spec, edges}
 	)
 	if err != nil {
 		return nil, err
@@ -613,44 +774,18 @@ func marshalRun(createdAt string, edges []*adagio.Edge) ([]byte, error) {
 	return json.Marshal(&run)
 }
 
-type states []adagio.Node_Status
+func statusToString(status adagio.Node_Status) string {
+	return strings.ToLower(status.String())
+}
 
-func (s states) contains(state adagio.Node_Status) bool {
-	for _, needle := range s {
-		if state == needle {
+type types []adagio.Event_Type
+
+func (t types) contains(typ adagio.Event_Type) bool {
+	for _, needle := range t {
+		if needle == typ {
 			return true
 		}
 	}
 
 	return false
-}
-
-func stateFromString(state string) (adagio.Node_Status, error) {
-	switch state {
-	case "waiting":
-		return adagio.Node_WAITING, nil
-	case "ready":
-		return adagio.Node_READY, nil
-	case "running":
-		return adagio.Node_RUNNING, nil
-	case "completed":
-		return adagio.Node_COMPLETED, nil
-	default:
-		return adagio.Node_WAITING, errors.New("state not recognized")
-	}
-}
-
-func stateToString(state adagio.Node_Status) (string, error) {
-	switch state {
-	case adagio.Node_WAITING:
-		return "waiting", nil
-	case adagio.Node_READY:
-		return "ready", nil
-	case adagio.Node_RUNNING:
-		return "running", nil
-	case adagio.Node_COMPLETED:
-		return "completed", nil
-	default:
-		return "", errors.New("state not recognized")
-	}
 }
