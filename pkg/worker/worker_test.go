@@ -307,5 +307,5 @@ func TestPool_Error_NODE_ORPHANED(t *testing.T) {
 	}}, repo.finishCalls[0])
 
 	// ensure runtime was never invoked
-	assert.Equal(t, uint64(1), runtimeCalls)
+	assert.Equal(t, uint64(0), runtimeCalls)
 }

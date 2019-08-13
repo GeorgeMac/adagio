@@ -104,11 +104,20 @@ func (p *Pool) handleEvent(event *adagio.Event) error {
 
 	log.Printf("claimed run %q node %q\n", event.RunID, event.NodeSpec.Name)
 
-	result, err := runtime.Run(node)
-	nodeResult := &adagio.Node_Result{
-		Conclusion: adagio.Node_Result_Conclusion(result.Conclusion),
-		Metadata:   result.Metadata,
-		Output:     result.Output,
+	nodeResult := &adagio.Node_Result{}
+
+	switch event.Type {
+	case adagio.Event_NODE_READY:
+		var result *adagio.Result
+		result, err = runtime.Run(node)
+		nodeResult = &adagio.Node_Result{
+			Conclusion: adagio.Node_Result_Conclusion(result.Conclusion),
+			Metadata:   result.Metadata,
+			Output:     result.Output,
+		}
+
+	case adagio.Event_NODE_ORPHANED:
+		err = errors.New("node was orphaned")
 	}
 
 	if err != nil {
