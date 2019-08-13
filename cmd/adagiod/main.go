@@ -72,7 +72,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		repo = etcd.New(cli.KV, cli.Watcher)
+		repo = etcd.New(cli.KV, cli.Watcher, cli.Lease)
 	default:
 		fmt.Printf("unexpected backend repository type %q expected one of [memory|etcd]\n", *backend)
 		os.Exit(1)
