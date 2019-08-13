@@ -492,77 +492,59 @@ func (r *Repository) Subscribe(events chan<- *adagio.Event, typ ...adagio.Event_
 				continue
 			}
 
-			if len(resp.Events) > 0 {
-				for _, ev := range resp.Events {
-					if ev.IsCreate() {
-						keyParts := strings.Split(r.ns.stripBytes(ev.Kv.Key), "/")
-						if len(keyParts) < 6 {
-							continue
-						}
+			for _, ev := range resp.Events {
+				keyParts := strings.Split(r.ns.stripBytes(ev.Kv.Key), "/")
+				if len(keyParts) < 6 || keyParts[0] != "states" {
+					// we're only interested in keys that represent states
+					continue
+				}
 
-						run, err := r.getRun(context.Background(), keyParts[3])
-						if err != nil {
-							log.Println(keyParts[3], err)
-							continue
-						}
+				status := stringToStatus(keyParts[1])
+				switch status {
+				// we're only interested in actions on ready and running keys
+				case adagio.Node_READY, adagio.Node_RUNNING:
+				default:
+					continue
+				}
 
-						node, err := run.GetNodeByName(keyParts[5])
-						if err != nil {
-							log.Println(err)
-							continue
-						}
+				run, err := r.getRun(context.Background(), keyParts[3], clientv3.WithRev(resp.Header.Revision))
+				if err != nil {
+					log.Println(keyParts[3], err)
+					continue
+				}
 
-						if types(typ).contains(adagio.Event_STATE_TRANSITION) {
-							events <- &adagio.Event{
-								Type:     adagio.Event_STATE_TRANSITION,
-								RunID:    keyParts[3],
-								NodeSpec: node.Spec,
-							}
-						}
+				node, err := run.GetNodeByName(keyParts[5])
+				if err != nil {
+					log.Println(err)
+					continue
+				}
 
-						continue
+				// if a ready status key has been created and the subscription contains a
+				// node ready type then send a node ready event
+				if ev.IsCreate() && status == adagio.Node_READY && types(typ).contains(adagio.Event_NODE_READY) {
+					events <- &adagio.Event{
+						Type:     adagio.Event_NODE_READY,
+						RunID:    keyParts[3],
+						NodeSpec: node.Spec,
 					}
 
-					// todo(george): import issues with etcd returning old urls from types
-					// defined in new url scheme makes importing other etcd v3 libs to break
-					// until then I am just going to compare to the literal 1 value which means
-					// DELETE operation
-					if ev.Type == 1 {
-						keyParts := strings.Split(r.ns.stripBytes(ev.Kv.Key), "/")
-						if len(keyParts) < 6 {
-							continue
-						}
+					continue
+				}
 
-						if keyParts[1] != "running" {
-							// ignore non-running deletes
-							continue
-						}
-
-						run, err := r.getRun(context.Background(), keyParts[3])
-						if err != nil {
-							log.Println(keyParts[3], err)
-							continue
-						}
-
-						node, err := run.GetNodeByName(keyParts[5])
-						if err != nil {
-							log.Println(err)
-							continue
-						}
-
-						if node.Status != adagio.Node_NONE {
-							// normal node deletion is expected behavior
-							// nodes with NONE status after deletion is
-							// the signal of an orphaning of a node
-							continue
-						}
-
-						if types(typ).contains(adagio.Event_NODE_ORPHANED) {
-							events <- &adagio.Event{
-								Type:     adagio.Event_NODE_ORPHANED,
-								RunID:    keyParts[3],
-								NodeSpec: node.Spec,
-							}
+				// todo(george): import issues with etcd returning old urls from types
+				// defined in new url scheme makes importing other etcd v3 libs to break
+				// until then I am just going to compare to the literal 1 value which means
+				// DELETE operation
+				// given the deletion of a running key where no other state key for the
+				// node exists (this is where GetNodeByName returns a node with a NONE status)
+				if ev.Type == 1 && status == adagio.Node_RUNNING && node.Status == adagio.Node_NONE {
+					// only send if the subscription contains the node orphaned
+					// event type
+					if types(typ).contains(adagio.Event_NODE_ORPHANED) {
+						events <- &adagio.Event{
+							Type:     adagio.Event_NODE_ORPHANED,
+							RunID:    keyParts[3],
+							NodeSpec: node.Spec,
 						}
 					}
 				}
@@ -573,12 +555,12 @@ func (r *Repository) Subscribe(events chan<- *adagio.Event, typ ...adagio.Event_
 	return nil
 }
 
-func (r *Repository) getRun(ctxt context.Context, id string) (*adagio.Run, error) {
+func (r *Repository) getRun(ctxt context.Context, id string, ops ...clientv3.OpOption) (*adagio.Run, error) {
 	run := &adagio.Run{
 		Id: id,
 	}
 
-	resp, err := r.kv.Get(ctxt, r.ns.runKey(run))
+	resp, err := r.kv.Get(ctxt, r.ns.runKey(run), ops...)
 	if err != nil {
 		return nil, err
 	}
@@ -593,7 +575,7 @@ func (r *Repository) getRun(ctxt context.Context, id string) (*adagio.Run, error
 	}
 
 	// re-hydrate current node states
-	if err := r.nodesForRun(ctxt, run); err != nil {
+	if err := r.nodesForRun(ctxt, run, ops...); err != nil {
 		return nil, err
 	}
 
@@ -619,15 +601,25 @@ func (r *Repository) getRun(ctxt context.Context, id string) (*adagio.Run, error
 	return run, nil
 }
 
-func (r *Repository) nodesForRun(ctxt context.Context, run *adagio.Run) error {
+func (r *Repository) nodesForRun(ctxt context.Context, run *adagio.Run, ops ...clientv3.OpOption) error {
+	// ensure all calls use with prefix
+	ops = append(ops, clientv3.WithPrefix())
+
 	var (
 		prefix    = r.ns.allNodesKey(run)
 		nodes     = map[string]*adagio.Node{}
-		resp, err = r.kv.Get(ctxt, prefix, clientv3.WithPrefix())
+		resp, err = r.kv.Get(ctxt, prefix, ops...)
 	)
 
 	if err != nil {
 		return err
+	}
+
+	// given no options are supplied then enforce all nodes header revision
+	// is used for subsequent calls
+	// < 2 because we added with prefix
+	if len(ops) < 2 {
+		ops = append(ops, clientv3.WithRev(resp.Header.Revision))
 	}
 
 	// create mapping for existing nodes in-order
@@ -643,7 +635,7 @@ func (r *Repository) nodesForRun(ctxt context.Context, run *adagio.Run) error {
 		}
 
 		// check status key exists at store revision for each node
-		resp, err := r.kv.Get(ctxt, r.ns.nodeInStateKey(run.Id, statusToString(node.Status), node.Spec.Name), clientv3.WithPrefix(), clientv3.WithRev(resp.Header.Revision))
+		resp, err := r.kv.Get(ctxt, r.ns.nodeInStateKey(run.Id, statusToString(node.Status), node.Spec.Name), ops...)
 		if err != nil {
 			return err
 		}
@@ -776,6 +768,10 @@ func marshalRun(createdAt string, spec []*adagio.Node_Spec, edges []*adagio.Edge
 
 func statusToString(status adagio.Node_Status) string {
 	return strings.ToLower(status.String())
+}
+
+func stringToStatus(status string) adagio.Node_Status {
+	return adagio.Node_Status(adagio.Node_Status_value[strings.ToUpper(status)])
 }
 
 type types []adagio.Event_Type

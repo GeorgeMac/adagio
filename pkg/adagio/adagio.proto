@@ -20,7 +20,7 @@ message Run {
 
 message Event {
   enum Type {
-    STATE_TRANSITION = 0;
+    NODE_READY = 0;
     NODE_ORPHANED = 1;
   }
 
