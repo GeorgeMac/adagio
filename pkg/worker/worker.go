@@ -113,6 +113,7 @@ func (p *Pool) handleEvent(event *adagio.Event) error {
 
 	if err != nil {
 		nodeResult.Conclusion = adagio.Node_Result_ERROR
+		nodeResult.Output = []byte(err.Error())
 	}
 
 	if err := p.repo.FinishNode(event.RunID, event.NodeSpec.Name, nodeResult); err != nil {

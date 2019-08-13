@@ -226,6 +226,7 @@ func TestPool_Error_RuntimeError(t *testing.T) {
 	// ensure 1 finish call is made
 	require.Len(t, repo.finishCalls, 1)
 	assert.Equal(t, finishCall{"bar", "foo", &adagio.Node_Result{
+		Output:     []byte("something went wrong"),
 		Conclusion: adagio.Node_Result_ERROR,
 	}}, repo.finishCalls[0])
 
