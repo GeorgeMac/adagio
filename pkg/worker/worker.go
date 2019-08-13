@@ -67,7 +67,7 @@ func (p *Pool) Run(ctxt context.Context) {
 		go func() {
 			defer wg.Done()
 			events := make(chan *adagio.Event, 10)
-			p.repo.Subscribe(events, adagio.Event_STATE_TRANSITION)
+			p.repo.Subscribe(events, adagio.Event_NODE_READY, adagio.Event_NODE_ORPHANED)
 
 			for {
 				select {
