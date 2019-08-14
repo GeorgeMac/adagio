@@ -15,6 +15,7 @@ require (
 	github.com/fatih/gomodifytags v0.0.0-20180914191908-141225bf62b6 // indirect
 	github.com/fatih/motion v0.0.0-20180408211639-218875ebe238 // indirect
 	github.com/go-delve/delve v1.2.0 // indirect
+	github.com/gofrs/uuid v3.2.0+incompatible
 	github.com/gogo/protobuf v1.2.1 // indirect
 	github.com/golang/protobuf v1.3.2
 	github.com/google/btree v1.0.0 // indirect
@@ -38,6 +39,7 @@ require (
 	github.com/mdempsky/gocode v0.0.0-20190203001940-7fb65232883f // indirect
 	github.com/nicksnyder/go-i18n v1.10.0 // indirect
 	github.com/oklog/ulid v1.3.1
+	github.com/oklog/ulid/v2 v2.0.2
 	github.com/pelletier/go-toml v1.2.0 // indirect
 	github.com/peterbourgon/ff v1.2.0
 	github.com/peterh/liner v1.1.0 // indirect
