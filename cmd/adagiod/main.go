@@ -167,7 +167,9 @@ func agent(ctxt context.Context, repo worker.Repository) {
 				return &adagio.Result{}, errors.New("something went wrong")
 			}),
 			"panic": worker.RuntimeFunc(func(node *adagio.Node) (*adagio.Result, error) {
-				if rand.Intn(2) > 0 {
+				r := rand.New(rand.NewSource(time.Now().UnixNano()))
+				if x := r.Intn(10); x > 4 {
+					fmt.Println("got:", x)
 					panic("uh oh")
 				}
 
