@@ -20,6 +20,7 @@ services:
       - -backend-type=etcd
       - -etcd-addresses=http://etcd:2379
       - agent
+    restart: always
   agent_two:
     build:
       context: .
@@ -29,6 +30,7 @@ services:
       - -backend-type=etcd
       - -etcd-addresses=http://etcd:2379
       - agent
+    restart: always
   etcd:
     image: gcr.io/etcd-development/etcd:v3.3
     command:

@@ -3,22 +3,31 @@ package adagio
 import (
 	"errors"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/georgemac/adagio/pkg/graph"
-	"github.com/oklog/ulid"
+	"github.com/oklog/ulid/v2"
 )
 
-var entropy = ulid.Monotonic(rand.New(rand.NewSource(time.Now().UnixNano())), 0)
+var (
+	entropy = ulid.Monotonic(rand.New(rand.NewSource(time.Now().UnixNano())), 0)
+	mu      sync.Mutex
+)
 
 func NewRun(spec *GraphSpec) (run *Run, err error) {
-	now := time.Now().UTC()
-	run = &Run{
-		Id:        ulid.MustNew(ulid.Timestamp(now), entropy).String(),
-		CreatedAt: now.Format(time.RFC3339),
-		Edges:     spec.Edges,
-		Nodes:     buildNodes(spec.Nodes),
-	}
+	func() {
+		mu.Lock()
+		defer mu.Unlock()
+
+		now := time.Now().UTC()
+		run = &Run{
+			Id:        ulid.MustNew(ulid.Timestamp(now), entropy).String(),
+			CreatedAt: now.Format(time.RFC3339),
+			Edges:     spec.Edges,
+			Nodes:     buildNodes(spec.Nodes),
+		}
+	}()
 
 	graph := GraphFrom(run)
 
@@ -68,7 +77,10 @@ func setInitialNodeStates(graph *graph.Graph, nodes []*Node) error {
 
 		if len(incoming) == 0 {
 			node.Status = Node_READY
+			continue
 		}
+
+		node.Status = Node_WAITING
 	}
 
 	return nil

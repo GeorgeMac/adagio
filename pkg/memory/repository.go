@@ -17,8 +17,7 @@ var (
 )
 
 type (
-	nodeSet     map[*adagio.Node]struct{}
-	listenerSet map[adagio.Node_Status][]chan<- *adagio.Event
+	listenerSet map[adagio.Event_Type][]chan<- *adagio.Event
 
 	runState struct {
 		run    *adagio.Run
@@ -28,7 +27,11 @@ type (
 )
 
 type Repository struct {
-	runs map[string]runState
+	runs   map[string]runState
+	claims map[string]struct {
+		run  *adagio.Run
+		node *adagio.Node
+	}
 
 	listeners listenerSet
 	mu        sync.Mutex
@@ -38,7 +41,11 @@ type Repository struct {
 
 func New() *Repository {
 	return &Repository{
-		runs:      map[string]runState{},
+		runs: map[string]runState{},
+		claims: map[string]struct {
+			run  *adagio.Run
+			node *adagio.Node
+		}{},
 		listeners: listenerSet{},
 	}
 }
@@ -64,7 +71,7 @@ func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err erro
 		state.lookup[node.Spec.Name] = node
 
 		if node.Status == adagio.Node_READY {
-			r.notifyListeners(run, node, adagio.Node_WAITING, adagio.Node_READY)
+			r.notifyReady(run, node)
 		}
 	}
 
@@ -119,7 +126,7 @@ func (r *Repository) ListRuns() (runs []*adagio.Run, err error) {
 	return
 }
 
-func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
+func (r *Repository) ClaimNode(runID, name string, claim *adagio.Claim) (*adagio.Node, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -145,23 +152,27 @@ func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
 	// update node state to running
 	node.Status = adagio.Node_RUNNING
 	node.StartedAt = r.now().Format(time.RFC3339)
+	node.Claim = claim
 
-	r.notifyListeners(state.run, node, adagio.Node_READY, adagio.Node_RUNNING)
+	r.claims[claim.Id] = struct {
+		run  *adagio.Run
+		node *adagio.Node
+	}{state.run, node}
 
 	return node, true, nil
 }
 
-func (r *Repository) notifyListeners(run *adagio.Run, node *adagio.Node, from, to adagio.Node_Status) {
-	for _, ch := range r.listeners[to] {
+func (r *Repository) notifyReady(run *adagio.Run, node *adagio.Node) {
+	for _, ch := range r.listeners[adagio.Event_NODE_READY] {
 		select {
-		case ch <- &adagio.Event{RunID: run.Id, NodeSpec: node.Spec, Type: adagio.Event_STATE_TRANSITION}:
+		case ch <- &adagio.Event{RunID: run.Id, NodeSpec: node.Spec, Type: adagio.Event_NODE_READY}:
 			// attempt to send
 		default:
 		}
 	}
 }
 
-func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result) error {
+func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result, claim *adagio.Claim) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -179,12 +190,12 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result) 
 	node.FinishedAt = r.now().Format(time.RFC3339)
 	node.Attempts = append(node.Attempts, result)
 
-	r.notifyListeners(state.run, node, adagio.Node_RUNNING, adagio.Node_COMPLETED)
-
 	outgoing, err := state.graph.Outgoing(node)
 	if err != nil {
 		return errors.Wrapf(err, "finishing node %q", node)
 	}
+
+	delete(r.claims, claim.Id)
 
 	if result.Conclusion == adagio.Node_Result_SUCCESS {
 		return r.handleSuccess(state, node, outgoing, result)
@@ -224,7 +235,7 @@ func (r *Repository) handleSuccess(state runState, node *adagio.Node, outgoing m
 		if ready {
 			out.Status = adagio.Node_READY
 
-			r.notifyListeners(state.run, out, adagio.Node_WAITING, adagio.Node_READY)
+			r.notifyReady(state.run, out)
 		}
 	}
 
@@ -237,7 +248,7 @@ func (r *Repository) handleFailure(state runState, node *adagio.Node, src map[gr
 		node.Status = adagio.Node_READY
 		node.FinishedAt = ""
 
-		r.notifyListeners(state.run, node, adagio.Node_RUNNING, adagio.Node_READY)
+		r.notifyReady(state.run, node)
 
 		return nil
 	}
@@ -250,8 +261,6 @@ func (r *Repository) handleFailure(state runState, node *adagio.Node, src map[gr
 		out.Status = adagio.Node_COMPLETED
 		out.StartedAt = r.now().Format(time.RFC3339)
 		out.FinishedAt = r.now().Format(time.RFC3339)
-
-		r.notifyListeners(state.run, out, out.Status, adagio.Node_COMPLETED)
 
 		outgoing, err := state.graph.Outgoing(out)
 		if err != nil {
@@ -267,12 +276,12 @@ func (r *Repository) handleFailure(state runState, node *adagio.Node, src map[gr
 	return nil
 }
 
-func (r *Repository) Subscribe(events chan<- *adagio.Event, states ...adagio.Node_Status) error {
+func (r *Repository) Subscribe(events chan<- *adagio.Event, types ...adagio.Event_Type) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	for _, state := range states {
-		r.listeners[state] = append(r.listeners[state], events)
+	for _, typ := range types {
+		r.listeners[typ] = append(r.listeners[typ], events)
 	}
 
 	return nil

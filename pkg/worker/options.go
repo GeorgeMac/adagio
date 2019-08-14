@@ -10,8 +10,14 @@ func (o Options) Apply(p *Pool) {
 	}
 }
 
-func WorkerCount(count int) Option {
+func WithWorkerCount(count int) Option {
 	return func(p *Pool) {
 		p.size = count
+	}
+}
+
+func WithClaimerFunc(fn func() Claimer) Option {
+	return func(p *Pool) {
+		p.newClaimer = fn
 	}
 }

@@ -2,9 +2,9 @@ package repository
 
 import (
 	"fmt"
+	"math/rand"
 	"sort"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -12,6 +12,7 @@ import (
 	"github.com/georgemac/adagio/pkg/service/controlplane"
 	"github.com/georgemac/adagio/pkg/worker"
 	"github.com/kr/pretty"
+	"github.com/oklog/ulid/v2"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -70,17 +71,25 @@ type Repository interface {
 	worker.Repository
 }
 
+type Orphaner interface {
+	Orphan(claim *adagio.Claim)
+}
+
+type OrphanFunc func(*adagio.Claim)
+
+func (o OrphanFunc) Orphan(c *adagio.Claim) { o(c) }
+
 type UnsubscribeRepository interface {
 	Repository
 	UnsubscribeAll(chan<- *adagio.Event) error
 }
 
-type Constructor func(func() time.Time) Repository
+type Constructor func(func() time.Time) (Repository, Orphaner)
 
 func TestHarness(t *testing.T, repoFn Constructor) {
 	t.Helper()
 
-	repo := repoFn(func() time.Time {
+	repo, orphaner := repoFn(func() time.Time {
 		return when
 	})
 
@@ -113,13 +122,9 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"b": adagio.Node_Result_SUCCESS,
 				},
 				Events: []*adagio.Event{
-					{RunID: run.Id, NodeSpec: a, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: a, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: b, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: b, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: d, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: f, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_NODE_READY},
+					{RunID: run.Id, NodeSpec: d, Type: adagio.Event_NODE_READY},
+					{RunID: run.Id, NodeSpec: f, Type: adagio.Event_NODE_READY},
 				},
 				RunStatus: adagio.Run_RUNNING,
 			},
@@ -153,13 +158,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"f": adagio.Node_Result_SUCCESS,
 				},
 				Events: []*adagio.Event{
-					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: d, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: d, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: e, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: f, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: f, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: e, Type: adagio.Event_NODE_READY},
 				},
 				RunStatus: adagio.Run_RUNNING,
 			},
@@ -185,9 +184,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"e": adagio.Node_Result_SUCCESS,
 				},
 				Events: []*adagio.Event{
-					{RunID: run.Id, NodeSpec: e, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: e, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: g, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: g, Type: adagio.Event_NODE_READY},
 				},
 				RunStatus: adagio.Run_RUNNING,
 			},
@@ -208,10 +205,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 						"f": []byte("f"),
 					}),
 				},
-				Events: []*adagio.Event{
-					{RunID: run.Id, NodeSpec: g, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: g, Type: adagio.Event_STATE_TRANSITION},
-				},
+				Events: []*adagio.Event{},
 				Finish: map[string]adagio.Node_Result_Conclusion{
 					"g": adagio.Node_Result_SUCCESS,
 				},
@@ -249,7 +243,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"e": []byte("e"),
 					"f": []byte("f"),
 				}, success("g")),
-			}, runs[0].Nodes)
+			}, stripClaims(runs[0].Nodes))
 		})
 	})
 
@@ -282,13 +276,9 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"b": adagio.Node_Result_SUCCESS,
 				},
 				Events: []*adagio.Event{
-					{RunID: run.Id, NodeSpec: a, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: a, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: b, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: b, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: d, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: f, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_NODE_READY},
+					{RunID: run.Id, NodeSpec: d, Type: adagio.Event_NODE_READY},
+					{RunID: run.Id, NodeSpec: f, Type: adagio.Event_NODE_READY},
 				},
 				RunStatus: adagio.Run_RUNNING,
 			},
@@ -320,16 +310,6 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"c": adagio.Node_Result_SUCCESS,
 					"d": adagio.Node_Result_FAIL,
 					"f": adagio.Node_Result_SUCCESS,
-				},
-				Events: []*adagio.Event{
-					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: d, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: d, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: e, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: f, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: f, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: g, Type: adagio.Event_STATE_TRANSITION},
 				},
 				RunStatus: adagio.Run_COMPLETED,
 			},
@@ -364,7 +344,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				completed(g, map[string][]byte{
 					"f": []byte("f"),
 				}),
-			}, runs[1].Nodes)
+			}, stripClaims(runs[1].Nodes))
 		})
 	})
 
@@ -410,11 +390,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"b": adagio.Node_Result_SUCCESS,
 				},
 				Events: []*adagio.Event{
-					{RunID: run.Id, NodeSpec: a, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: a, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: b, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: b, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: h, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: h, Type: adagio.Event_NODE_READY},
 				},
 				RunStatus: adagio.Run_RUNNING,
 			},
@@ -436,8 +412,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"h": adagio.Node_Result_ERROR,
 				},
 				Events: []*adagio.Event{
-					{RunID: run.Id, NodeSpec: h, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: h, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: h, Type: adagio.Event_NODE_READY},
 				},
 				RunStatus: adagio.Run_RUNNING,
 			},
@@ -459,9 +434,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"h": adagio.Node_Result_SUCCESS,
 				},
 				Events: []*adagio.Event{
-					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: h, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: h, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_NODE_READY},
 				},
 				RunStatus: adagio.Run_RUNNING,
 			},
@@ -482,10 +455,6 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				},
 				Finish: map[string]adagio.Node_Result_Conclusion{
 					"c": adagio.Node_Result_SUCCESS,
-				},
-				Events: []*adagio.Event{
-					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_STATE_TRANSITION},
 				},
 				RunStatus: adagio.Run_COMPLETED,
 			},
@@ -511,7 +480,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				completed(h, map[string][]byte{
 					"a": []byte("a"),
 				}, errorResult("h"), success("h")),
-			}, runs[2].Nodes)
+			}, stripClaims(runs[2].Nodes))
 		})
 	})
 
@@ -557,11 +526,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"b": adagio.Node_Result_SUCCESS,
 				},
 				Events: []*adagio.Event{
-					{RunID: run.Id, NodeSpec: a, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: a, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: b, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: b, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: i, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: i, Type: adagio.Event_NODE_READY},
 				},
 				RunStatus: adagio.Run_RUNNING,
 			},
@@ -583,8 +548,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"i": adagio.Node_Result_FAIL,
 				},
 				Events: []*adagio.Event{
-					{RunID: run.Id, NodeSpec: i, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: i, Type: adagio.Event_STATE_TRANSITION},
+					{RunID: run.Id, NodeSpec: i, Type: adagio.Event_NODE_READY},
 				},
 				RunStatus: adagio.Run_RUNNING,
 			},
@@ -604,11 +568,6 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				},
 				Finish: map[string]adagio.Node_Result_Conclusion{
 					"i": adagio.Node_Result_FAIL,
-				},
-				Events: []*adagio.Event{
-					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: i, Type: adagio.Event_STATE_TRANSITION},
-					{RunID: run.Id, NodeSpec: i, Type: adagio.Event_STATE_TRANSITION},
 				},
 				RunStatus: adagio.Run_COMPLETED,
 			},
@@ -633,7 +592,74 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				completed(i, map[string][]byte{
 					"a": []byte("a"),
 				}, fail("i"), fail("i")),
-			}, runs[3].Nodes)
+			}, stripClaims(runs[3].Nodes))
+		})
+	})
+
+	t.Run("a run with an orphaned node", func(t *testing.T) {
+		// (a)
+		run, err := repo.StartRun(&adagio.GraphSpec{
+			Nodes: []*adagio.Node_Spec{
+				a,
+			},
+			Edges: []*adagio.Edge{},
+		})
+		require.Nil(t, err)
+		require.NotNil(t, run)
+
+		var (
+			events    = make(chan *adagio.Event, 5)
+			collected = make([]*adagio.Event, 0)
+		)
+
+		err = repo.Subscribe(events, adagio.Event_NODE_READY, adagio.Event_NODE_ORPHANED)
+		require.Nil(t, err)
+
+		assert.Equal(t, adagio.Run_WAITING, run.Status)
+
+		var claims map[string]*adagio.Claim
+		t.Run("an initial claim is made", func(t *testing.T) {
+			// ensure node can initially be claimed
+			claims = canClaim(t, repo, run, map[string]*adagio.Node{"a": running(a, nil)})
+		})
+
+		// orphan claim for node "a" from run
+		orphaner.Orphan(claims[a.Name])
+
+		t.Run("the orphaned node", func(t *testing.T) {
+			// ensure orphaned node can be claimed again and has no results yet
+			claims = canClaim(t, repo, run, map[string]*adagio.Node{"a": running(a, nil)})
+		})
+
+		// can error the node
+		canFinish(t, repo, run, map[string]adagio.Node_Result_Conclusion{"a": adagio.Node_Result_ERROR}, claims)
+
+		select {
+		case event := <-events:
+			collected = append(collected, event)
+		case <-time.After(5 * time.Second):
+			t.Error("timeout collecting events")
+			return
+		}
+
+		expected := []*adagio.Event{
+			{RunID: run.Id, NodeSpec: a, Type: adagio.Event_NODE_ORPHANED},
+		}
+		if !assert.Equal(t, expected, collected) {
+			fmt.Println(pretty.Diff(expected, collected))
+		}
+
+		t.Run("the run is listed", func(t *testing.T) {
+			runs, err := repo.ListRuns()
+			require.Nil(t, err)
+
+			// the run is listed
+			assert.Len(t, runs, 5)
+			assert.Equal(t, run.Id, runs[4].Id)
+
+			assert.Equal(t, []*adagio.Node{
+				completed(a, nil, errorResult("a")),
+			}, stripClaims(runs[4].Nodes))
 		})
 	})
 }
@@ -655,7 +681,7 @@ func (l *TestLayer) Exec(t *testing.T) {
 	var (
 		events    = make(chan *adagio.Event, len(l.Events))
 		collected = make([]*adagio.Event, 0)
-		err       = l.Repository.Subscribe(events, adagio.Node_READY, adagio.Node_RUNNING, adagio.Node_COMPLETED)
+		err       = l.Repository.Subscribe(events, adagio.Event_NODE_READY)
 	)
 	require.Nil(t, err)
 
@@ -667,13 +693,14 @@ func (l *TestLayer) Exec(t *testing.T) {
 		close(events)
 	}()
 
+	var claims map[string]*adagio.Claim
 	t.Run(l.Name, func(t *testing.T) {
 		canNotClaim(t, l.Repository, l.Run, l.Unclaimable...)
 
-		canClaim(t, l.Repository, l.Run, l.Claimable)
+		claims = canClaim(t, l.Repository, l.Run, l.Claimable)
 	})
 
-	canFinish(t, l.Repository, l.Run, l.Finish)
+	canFinish(t, l.Repository, l.Run, l.Finish, claims)
 
 	t.Run(fmt.Sprintf("the run is reported with a status of %q", l.RunStatus), func(t *testing.T) {
 		// check run reports expected status
@@ -714,7 +741,7 @@ func canNotClaim(t *testing.T, repo Repository, run *adagio.Run, names ...string
 				func(name string) {
 					t.Parallel()
 
-					_, _, err := repo.ClaimNode(run.Id, name)
+					_, _, err := repo.ClaimNode(run.Id, name, newClaim())
 					assert.Equal(t, adagio.ErrNodeNotReady, errors.Cause(err))
 				}(name)
 			})
@@ -722,8 +749,11 @@ func canNotClaim(t *testing.T, repo Repository, run *adagio.Run, names ...string
 	})
 }
 
-func canClaim(t *testing.T, repo Repository, run *adagio.Run, nodes map[string]*adagio.Node) {
+func canClaim(t *testing.T, repo Repository, run *adagio.Run, nodes map[string]*adagio.Node) (claims map[string]*adagio.Claim) {
 	t.Helper()
+
+	var mu sync.Mutex
+	claims = map[string]*adagio.Claim{}
 
 	t.Run("can claim", func(t *testing.T) {
 		t.Parallel()
@@ -733,42 +763,53 @@ func canClaim(t *testing.T, repo Repository, run *adagio.Run, nodes map[string]*
 				func(name string, node *adagio.Node) {
 					t.Parallel()
 
-					claimed := attemptNClaims(t, repo, run, name, 5)
+					claimed, claim := attemptNClaims(t, repo, run, name, 5)
+					node.Claim = claim
 
 					t.Run("and it returns the correct node", func(t *testing.T) {
 						assert.Equal(t, node, claimed)
 					})
+
+					mu.Lock()
+					claims[name] = claim
+					mu.Unlock()
 				}(name, node)
 			})
 		}
 	})
+
+	return
 }
 
-func canFinish(t *testing.T, repo Repository, run *adagio.Run, names map[string]adagio.Node_Result_Conclusion) {
+func canFinish(t *testing.T, repo Repository, run *adagio.Run, names map[string]adagio.Node_Result_Conclusion, claims map[string]*adagio.Claim) {
 	t.Helper()
 
 	t.Run("can finish", func(t *testing.T) {
 		for name, conclusion := range names {
+			claim := claims[name]
+			require.NotNil(t, claim, "claim is missing")
+
 			t.Run(fmt.Sprintf("node %q", name), func(t *testing.T) {
-				func(name string, conclusion adagio.Node_Result_Conclusion) {
+				func(name string, conclusion adagio.Node_Result_Conclusion, claim *adagio.Claim) {
 					t.Parallel()
 
 					assert.Nil(t, repo.FinishNode(run.Id, name, &adagio.Node_Result{
 						Conclusion: conclusion,
 						Output:     []byte(name),
-					}))
-				}(name, conclusion)
+					}, claim))
+				}(name, conclusion, claim)
 			})
 		}
 	})
 }
 
-func attemptNClaims(t *testing.T, repo Repository, run *adagio.Run, name string, n int) (node *adagio.Node) {
+func attemptNClaims(t *testing.T, repo Repository, run *adagio.Run, name string, n int) (node *adagio.Node, claim *adagio.Claim) {
 	t.Helper()
 
 	t.Run("only one successful claim is made", func(t *testing.T) {
 		var (
 			wg    sync.WaitGroup
+			mu    sync.Mutex
 			count int32
 		)
 
@@ -776,13 +817,19 @@ func attemptNClaims(t *testing.T, repo Repository, run *adagio.Run, name string,
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-
-				cnode, ok, err := repo.ClaimNode(run.Id, name)
+				var (
+					cclaim         = newClaim()
+					cnode, ok, err = repo.ClaimNode(run.Id, name, cclaim)
+				)
 				require.Nil(t, err)
 
 				if ok {
-					atomic.AddInt32(&count, 1)
+					mu.Lock()
+					count++
 					node = cnode
+					claim = cclaim
+					mu.Unlock()
+
 					return
 				}
 
@@ -792,7 +839,7 @@ func attemptNClaims(t *testing.T, repo Repository, run *adagio.Run, name string,
 
 		wg.Wait()
 
-		assert.Equal(t, int32(1), count)
+		require.Equal(t, int32(1), count)
 	})
 
 	return
@@ -850,4 +897,19 @@ func result(output string, conclusion adagio.Node_Result_Conclusion) *adagio.Nod
 		Conclusion: conclusion,
 		Output:     data,
 	}
+}
+
+func newClaim() *adagio.Claim {
+	entropy := ulid.Monotonic(rand.New(rand.NewSource(time.Now().UnixNano())), 0)
+	return &adagio.Claim{
+		Id: ulid.MustNew(ulid.Timestamp(time.Now().UTC()), entropy).String(),
+	}
+}
+
+func stripClaims(nodes []*adagio.Node) []*adagio.Node {
+	for _, n := range nodes {
+		n.Claim = nil
+	}
+
+	return nodes
 }

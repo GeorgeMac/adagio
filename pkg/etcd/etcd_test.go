@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/georgemac/adagio/pkg/adagio"
 	"github.com/georgemac/adagio/pkg/repository"
 	"go.etcd.io/etcd/clientv3"
 )
@@ -25,11 +26,16 @@ func Test_Run_RepositoryTestHarness(t *testing.T) {
 		}
 	}()
 
-	repo := New(cli.KV, cli.Watcher, WithNamespace("adagio-test/"))
+	var (
+		repo     = New(cli.KV, cli.Watcher, cli.Lease, WithNamespace("adagio-test/"))
+		orphaner = repository.OrphanFunc(func(c *adagio.Claim) {
+			repo.cancelLease(c.Id)
+		})
+	)
 
-	repository.TestHarness(t, func(now func() time.Time) repository.Repository {
+	repository.TestHarness(t, func(now func() time.Time) (repository.Repository, repository.Orphaner) {
 		repo.now = now
 
-		return repo
+		return repo, orphaner
 	})
 }
