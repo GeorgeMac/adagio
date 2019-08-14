@@ -38,11 +38,13 @@ func TestPool_HappyPath_NODE_READY(t *testing.T) {
 		repo = newRepository(5, node)
 
 		claim     = &adagio.Claim{Id: "claim"}
-		claimFunc = func() *adagio.Claim {
-			return claim
+		claimFunc = func() Claimer {
+			return ClaimerFunc(func() *adagio.Claim {
+				return claim
+			})
 		}
 
-		pool = NewPool(&repo, runtimes, WorkerCount(5), ClaimFunc(claimFunc))
+		pool = NewPool(&repo, runtimes, WithWorkerCount(5), WithClaimerFunc(claimFunc))
 
 		done         = make(chan struct{})
 		ctxt, cancel = context.WithCancel(context.Background())
@@ -118,8 +120,12 @@ func TestPool_Error_RuntimeDoesNotExist(t *testing.T) {
 		repo = newRepository(5, node)
 
 		claim     = &adagio.Claim{Id: "claim"}
-		claimFunc = func() *adagio.Claim { return claim }
-		pool      = NewPool(&repo, runtimes, WorkerCount(5), ClaimFunc(claimFunc))
+		claimFunc = func() Claimer {
+			return ClaimerFunc(func() *adagio.Claim {
+				return claim
+			})
+		}
+		pool = NewPool(&repo, runtimes, WithWorkerCount(5), WithClaimerFunc(claimFunc))
 
 		done         = make(chan struct{})
 		ctxt, cancel = context.WithCancel(context.Background())
@@ -190,8 +196,12 @@ func TestPool_Error_RuntimeError(t *testing.T) {
 		repo = newRepository(5, node)
 
 		claim     = &adagio.Claim{Id: "claim"}
-		claimFunc = func() *adagio.Claim { return claim }
-		pool      = NewPool(&repo, runtimes, WorkerCount(5), ClaimFunc(claimFunc))
+		claimFunc = func() Claimer {
+			return ClaimerFunc(func() *adagio.Claim {
+				return claim
+			})
+		}
+		pool = NewPool(&repo, runtimes, WithWorkerCount(5), WithClaimerFunc(claimFunc))
 
 		done         = make(chan struct{})
 		ctxt, cancel = context.WithCancel(context.Background())
@@ -268,8 +278,12 @@ func TestPool_Error_NODE_ORPHANED(t *testing.T) {
 		repo = newRepository(5, node)
 
 		claim     = &adagio.Claim{Id: "claim"}
-		claimFunc = func() *adagio.Claim { return claim }
-		pool      = NewPool(&repo, runtimes, WorkerCount(5), ClaimFunc(claimFunc))
+		claimFunc = func() Claimer {
+			return ClaimerFunc(func() *adagio.Claim {
+				return claim
+			})
+		}
+		pool = NewPool(&repo, runtimes, WithWorkerCount(5), WithClaimerFunc(claimFunc))
 
 		done         = make(chan struct{})
 		ctxt, cancel = context.WithCancel(context.Background())

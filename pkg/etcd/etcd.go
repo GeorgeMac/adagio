@@ -136,16 +136,16 @@ func (r *Repository) ListRuns() (runs []*adagio.Run, err error) {
 	return
 }
 
-func (r *Repository) ClaimNode(runID, name string, claim *adagio.Claim) (*adagio.Node, bool, error) {
+func (r *Repository) ClaimNode(runID, name string, claim *adagio.Claim) (node *adagio.Node, claimed bool, err error) {
 	ctxt := context.Background()
 	run, err := r.getRun(ctxt, runID)
 	if err != nil {
 		return nil, false, err
 	}
 
-	node, err := run.GetNodeByName(name)
+	node, err = run.GetNodeByName(name)
 	if err != nil {
-		return nil, false, err
+		return
 	}
 
 	if node.Status == adagio.Node_WAITING {
@@ -165,6 +165,12 @@ func (r *Repository) ClaimNode(runID, name string, claim *adagio.Claim) (*adagio
 
 	// set claim on node
 	node.Claim = claim
+
+	defer func() {
+		if !claimed {
+			r.cancelLease(claim.Id)
+		}
+	}()
 
 	cmps, ops, err := r.transition(ctxt, runID, node, adagio.Node_RUNNING, nil, nil, clientv3.WithLease(leaseID))
 	if err != nil {

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"math/rand"
 	"sort"
 	"sync"
 	"testing"
@@ -10,8 +11,8 @@ import (
 	"github.com/georgemac/adagio/pkg/adagio"
 	"github.com/georgemac/adagio/pkg/service/controlplane"
 	"github.com/georgemac/adagio/pkg/worker"
-	"github.com/gofrs/uuid"
 	"github.com/kr/pretty"
+	"github.com/oklog/ulid/v2"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -899,8 +900,9 @@ func result(output string, conclusion adagio.Node_Result_Conclusion) *adagio.Nod
 }
 
 func newClaim() *adagio.Claim {
+	entropy := ulid.Monotonic(rand.New(rand.NewSource(time.Now().UnixNano())), 0)
 	return &adagio.Claim{
-		Id: uuid.Must(uuid.NewV4()).String(),
+		Id: ulid.MustNew(ulid.Timestamp(time.Now().UTC()), entropy).String(),
 	}
 }
 

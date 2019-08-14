@@ -1,7 +1,5 @@
 package worker
 
-import "github.com/georgemac/adagio/pkg/adagio"
-
 type Option func(*Pool)
 
 type Options []Option
@@ -12,14 +10,14 @@ func (o Options) Apply(p *Pool) {
 	}
 }
 
-func WorkerCount(count int) Option {
+func WithWorkerCount(count int) Option {
 	return func(p *Pool) {
 		p.size = count
 	}
 }
 
-func ClaimFunc(fn func() *adagio.Claim) Option {
+func WithClaimerFunc(fn func() Claimer) Option {
 	return func(p *Pool) {
-		p.newClaim = fn
+		p.newClaimer = fn
 	}
 }

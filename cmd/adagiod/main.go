@@ -166,9 +166,16 @@ func agent(ctxt context.Context, repo worker.Repository) {
 			"error": worker.RuntimeFunc(func(node *adagio.Node) (*adagio.Result, error) {
 				return &adagio.Result{}, errors.New("something went wrong")
 			}),
+			"panic": worker.RuntimeFunc(func(node *adagio.Node) (*adagio.Result, error) {
+				if rand.Intn(2) > 0 {
+					panic("uh oh")
+				}
+
+				return &adagio.Result{Conclusion: adagio.Result_SUCCESS}, nil
+			}),
 			"exec": exec.New(),
 		}
 	)
 
-	worker.NewPool(repo, runtimes, worker.WorkerCount(5)).Run(ctxt)
+	worker.NewPool(repo, runtimes, worker.WithWorkerCount(5)).Run(ctxt)
 }

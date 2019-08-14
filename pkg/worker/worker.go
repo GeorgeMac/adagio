@@ -9,14 +9,13 @@ import (
 	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
-	"github.com/oklog/ulid"
+	"github.com/oklog/ulid/v2"
 )
 
 var (
 	// ErrRuntimeDoesNotExist is returned when a node is claimed with an
 	// unkown runtime type
 	ErrRuntimeDoesNotExist = errors.New("runtime does not exist")
-	entropy                = ulid.Monotonic(rand.New(rand.NewSource(time.Now().UnixNano())), 0)
 )
 
 // Repository is the minimal interface for a backing repository which can
@@ -39,6 +38,17 @@ type RuntimeFunc func(*adagio.Node) (*adagio.Result, error)
 // Run delegates to the wrapped RuntimeFunc
 func (fn RuntimeFunc) Run(n *adagio.Node) (*adagio.Result, error) { return fn(n) }
 
+// Claimer is used to generate claims
+type Claimer interface {
+	NewClaim() *adagio.Claim
+}
+
+// ClaimerFunc is a function which can be used as a Claimer
+type ClaimerFunc func() *adagio.Claim
+
+// NewClaim delegates to underlying ClaimerFunc
+func (fn ClaimerFunc) NewClaim() *adagio.Claim { return fn() }
+
 // Pool spins up a number of worker goroutines which subscribe to nodes
 // transitioning into the ready state and then attempts to claim and
 // process them
@@ -48,7 +58,7 @@ type Pool struct {
 
 	size int
 
-	newClaim func() *adagio.Claim
+	newClaimer func() Claimer
 }
 
 // NewPool constructs and configures a new node pool for execution
@@ -57,10 +67,14 @@ func NewPool(repo Repository, runtimes map[string]Runtime, opts ...Option) *Pool
 		repo:     repo,
 		runtimes: runtimes,
 		size:     1,
-		newClaim: func() *adagio.Claim {
-			return &adagio.Claim{
-				Id: ulid.MustNew(ulid.Timestamp(time.Now().UTC()), entropy).String(),
-			}
+		newClaimer: func() Claimer {
+			entropy := ulid.Monotonic(rand.New(rand.NewSource(time.Now().UnixNano())), 0)
+
+			return ClaimerFunc(func() *adagio.Claim {
+				return &adagio.Claim{
+					Id: ulid.MustNew(ulid.Timestamp(time.Now().UTC()), entropy).String(),
+				}
+			})
 		},
 	}
 
@@ -79,13 +93,18 @@ func (p *Pool) Run(ctxt context.Context) {
 
 		go func() {
 			defer wg.Done()
-			events := make(chan *adagio.Event, 10)
+
+			var (
+				events  = make(chan *adagio.Event, 10)
+				claimer = p.newClaimer()
+			)
+
 			p.repo.Subscribe(events, adagio.Event_NODE_READY, adagio.Event_NODE_ORPHANED)
 
 			for {
 				select {
 				case event := <-events:
-					if err := p.handleEvent(event); err != nil {
+					if err := p.handleEvent(claimer, event); err != nil {
 						log.Println(err)
 					}
 
@@ -99,13 +118,14 @@ func (p *Pool) Run(ctxt context.Context) {
 	wg.Wait()
 }
 
-func (p *Pool) handleEvent(event *adagio.Event) error {
+func (p *Pool) handleEvent(claimer Claimer, event *adagio.Event) error {
 	runtime, ok := p.runtimes[event.NodeSpec.Runtime]
 	if !ok {
 		return ErrRuntimeDoesNotExist
 	}
 
-	claim := p.newClaim()
+	// construct a new claim
+	claim := claimer.NewClaim()
 
 	node, claimed, err := p.repo.ClaimNode(event.RunID, event.NodeSpec.Name, claim)
 	if err != nil {
