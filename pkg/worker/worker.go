@@ -4,21 +4,27 @@ import (
 	"context"
 	"errors"
 	"log"
+	"math/rand"
 	"sync"
+	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
+	"github.com/oklog/ulid"
 )
 
-// ErrRuntimeDoesNotExist is returned when a node is claimed with an
-// unkown runtime type
-var ErrRuntimeDoesNotExist = errors.New("runtime does not exist")
+var (
+	// ErrRuntimeDoesNotExist is returned when a node is claimed with an
+	// unkown runtime type
+	ErrRuntimeDoesNotExist = errors.New("runtime does not exist")
+	entropy                = ulid.Monotonic(rand.New(rand.NewSource(time.Now().UnixNano())), 0)
+)
 
 // Repository is the minimal interface for a backing repository which can
 // notify of node related events, issue node claims and finalize the result
 // of executing a node
 type Repository interface {
-	ClaimNode(runID, name string) (*adagio.Node, bool, error)
-	FinishNode(runID, name string, result *adagio.Node_Result) error
+	ClaimNode(runID, name string, claim *adagio.Claim) (*adagio.Node, bool, error)
+	FinishNode(runID, name string, result *adagio.Node_Result, claim *adagio.Claim) error
 	Subscribe(events chan<- *adagio.Event, types ...adagio.Event_Type) error
 }
 
@@ -41,6 +47,8 @@ type Pool struct {
 	runtimes map[string]Runtime
 
 	size int
+
+	newClaim func() *adagio.Claim
 }
 
 // NewPool constructs and configures a new node pool for execution
@@ -49,6 +57,11 @@ func NewPool(repo Repository, runtimes map[string]Runtime, opts ...Option) *Pool
 		repo:     repo,
 		runtimes: runtimes,
 		size:     1,
+		newClaim: func() *adagio.Claim {
+			return &adagio.Claim{
+				Id: ulid.MustNew(ulid.Timestamp(time.Now().UTC()), entropy).String(),
+			}
+		},
 	}
 
 	Options(opts).Apply(pool)
@@ -92,7 +105,9 @@ func (p *Pool) handleEvent(event *adagio.Event) error {
 		return ErrRuntimeDoesNotExist
 	}
 
-	node, claimed, err := p.repo.ClaimNode(event.RunID, event.NodeSpec.Name)
+	claim := p.newClaim()
+
+	node, claimed, err := p.repo.ClaimNode(event.RunID, event.NodeSpec.Name, claim)
 	if err != nil {
 		return err
 	}
@@ -125,7 +140,7 @@ func (p *Pool) handleEvent(event *adagio.Event) error {
 		nodeResult.Output = []byte(err.Error())
 	}
 
-	if err := p.repo.FinishNode(event.RunID, event.NodeSpec.Name, nodeResult); err != nil {
+	if err := p.repo.FinishNode(event.RunID, event.NodeSpec.Name, nodeResult, claim); err != nil {
 		return err
 	}
 

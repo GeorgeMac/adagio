@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"sort"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
 	"github.com/georgemac/adagio/pkg/service/controlplane"
 	"github.com/georgemac/adagio/pkg/worker"
+	"github.com/gofrs/uuid"
 	"github.com/kr/pretty"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -71,12 +71,12 @@ type Repository interface {
 }
 
 type Orphaner interface {
-	Orphan(run *adagio.Run, spec *adagio.Node_Spec)
+	Orphan(claim *adagio.Claim)
 }
 
-type OrphanFunc func(*adagio.Run, *adagio.Node_Spec)
+type OrphanFunc func(*adagio.Claim)
 
-func (o OrphanFunc) Orphan(r *adagio.Run, s *adagio.Node_Spec) { o(r, s) }
+func (o OrphanFunc) Orphan(c *adagio.Claim) { o(c) }
 
 type UnsubscribeRepository interface {
 	Repository
@@ -242,7 +242,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"e": []byte("e"),
 					"f": []byte("f"),
 				}, success("g")),
-			}, runs[0].Nodes)
+			}, stripClaims(runs[0].Nodes))
 		})
 	})
 
@@ -343,7 +343,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				completed(g, map[string][]byte{
 					"f": []byte("f"),
 				}),
-			}, runs[1].Nodes)
+			}, stripClaims(runs[1].Nodes))
 		})
 	})
 
@@ -479,7 +479,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				completed(h, map[string][]byte{
 					"a": []byte("a"),
 				}, errorResult("h"), success("h")),
-			}, runs[2].Nodes)
+			}, stripClaims(runs[2].Nodes))
 		})
 	})
 
@@ -591,7 +591,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				completed(i, map[string][]byte{
 					"a": []byte("a"),
 				}, fail("i"), fail("i")),
-			}, runs[3].Nodes)
+			}, stripClaims(runs[3].Nodes))
 		})
 	})
 
@@ -616,21 +616,22 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 
 		assert.Equal(t, adagio.Run_WAITING, run.Status)
 
+		var claims map[string]*adagio.Claim
 		t.Run("an initial claim is made", func(t *testing.T) {
 			// ensure node can initially be claimed
-			canClaim(t, repo, run, map[string]*adagio.Node{"a": running(a, nil)})
+			claims = canClaim(t, repo, run, map[string]*adagio.Node{"a": running(a, nil)})
 		})
 
-		// orphan node "a" from run
-		orphaner.Orphan(run, a)
+		// orphan claim for node "a" from run
+		orphaner.Orphan(claims[a.Name])
 
 		t.Run("the orphaned node", func(t *testing.T) {
 			// ensure orphaned node can be claimed again and has no results yet
-			canClaim(t, repo, run, map[string]*adagio.Node{"a": running(a, nil)})
+			claims = canClaim(t, repo, run, map[string]*adagio.Node{"a": running(a, nil)})
 		})
 
 		// can error the node
-		canFinish(t, repo, run, map[string]adagio.Node_Result_Conclusion{"a": adagio.Node_Result_ERROR})
+		canFinish(t, repo, run, map[string]adagio.Node_Result_Conclusion{"a": adagio.Node_Result_ERROR}, claims)
 
 		select {
 		case event := <-events:
@@ -657,7 +658,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 
 			assert.Equal(t, []*adagio.Node{
 				completed(a, nil, errorResult("a")),
-			}, runs[4].Nodes)
+			}, stripClaims(runs[4].Nodes))
 		})
 	})
 }
@@ -691,13 +692,14 @@ func (l *TestLayer) Exec(t *testing.T) {
 		close(events)
 	}()
 
+	var claims map[string]*adagio.Claim
 	t.Run(l.Name, func(t *testing.T) {
 		canNotClaim(t, l.Repository, l.Run, l.Unclaimable...)
 
-		canClaim(t, l.Repository, l.Run, l.Claimable)
+		claims = canClaim(t, l.Repository, l.Run, l.Claimable)
 	})
 
-	canFinish(t, l.Repository, l.Run, l.Finish)
+	canFinish(t, l.Repository, l.Run, l.Finish, claims)
 
 	t.Run(fmt.Sprintf("the run is reported with a status of %q", l.RunStatus), func(t *testing.T) {
 		// check run reports expected status
@@ -738,7 +740,7 @@ func canNotClaim(t *testing.T, repo Repository, run *adagio.Run, names ...string
 				func(name string) {
 					t.Parallel()
 
-					_, _, err := repo.ClaimNode(run.Id, name)
+					_, _, err := repo.ClaimNode(run.Id, name, newClaim())
 					assert.Equal(t, adagio.ErrNodeNotReady, errors.Cause(err))
 				}(name)
 			})
@@ -746,8 +748,11 @@ func canNotClaim(t *testing.T, repo Repository, run *adagio.Run, names ...string
 	})
 }
 
-func canClaim(t *testing.T, repo Repository, run *adagio.Run, nodes map[string]*adagio.Node) {
+func canClaim(t *testing.T, repo Repository, run *adagio.Run, nodes map[string]*adagio.Node) (claims map[string]*adagio.Claim) {
 	t.Helper()
+
+	var mu sync.Mutex
+	claims = map[string]*adagio.Claim{}
 
 	t.Run("can claim", func(t *testing.T) {
 		t.Parallel()
@@ -757,42 +762,53 @@ func canClaim(t *testing.T, repo Repository, run *adagio.Run, nodes map[string]*
 				func(name string, node *adagio.Node) {
 					t.Parallel()
 
-					claimed := attemptNClaims(t, repo, run, name, 5)
+					claimed, claim := attemptNClaims(t, repo, run, name, 5)
+					node.Claim = claim
 
 					t.Run("and it returns the correct node", func(t *testing.T) {
 						assert.Equal(t, node, claimed)
 					})
+
+					mu.Lock()
+					claims[name] = claim
+					mu.Unlock()
 				}(name, node)
 			})
 		}
 	})
+
+	return
 }
 
-func canFinish(t *testing.T, repo Repository, run *adagio.Run, names map[string]adagio.Node_Result_Conclusion) {
+func canFinish(t *testing.T, repo Repository, run *adagio.Run, names map[string]adagio.Node_Result_Conclusion, claims map[string]*adagio.Claim) {
 	t.Helper()
 
 	t.Run("can finish", func(t *testing.T) {
 		for name, conclusion := range names {
+			claim := claims[name]
+			require.NotNil(t, claim, "claim is missing")
+
 			t.Run(fmt.Sprintf("node %q", name), func(t *testing.T) {
-				func(name string, conclusion adagio.Node_Result_Conclusion) {
+				func(name string, conclusion adagio.Node_Result_Conclusion, claim *adagio.Claim) {
 					t.Parallel()
 
 					assert.Nil(t, repo.FinishNode(run.Id, name, &adagio.Node_Result{
 						Conclusion: conclusion,
 						Output:     []byte(name),
-					}))
-				}(name, conclusion)
+					}, claim))
+				}(name, conclusion, claim)
 			})
 		}
 	})
 }
 
-func attemptNClaims(t *testing.T, repo Repository, run *adagio.Run, name string, n int) (node *adagio.Node) {
+func attemptNClaims(t *testing.T, repo Repository, run *adagio.Run, name string, n int) (node *adagio.Node, claim *adagio.Claim) {
 	t.Helper()
 
 	t.Run("only one successful claim is made", func(t *testing.T) {
 		var (
 			wg    sync.WaitGroup
+			mu    sync.Mutex
 			count int32
 		)
 
@@ -800,13 +816,19 @@ func attemptNClaims(t *testing.T, repo Repository, run *adagio.Run, name string,
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-
-				cnode, ok, err := repo.ClaimNode(run.Id, name)
+				var (
+					cclaim         = newClaim()
+					cnode, ok, err = repo.ClaimNode(run.Id, name, cclaim)
+				)
 				require.Nil(t, err)
 
 				if ok {
-					atomic.AddInt32(&count, 1)
+					mu.Lock()
+					count++
 					node = cnode
+					claim = cclaim
+					mu.Unlock()
+
 					return
 				}
 
@@ -816,7 +838,7 @@ func attemptNClaims(t *testing.T, repo Repository, run *adagio.Run, name string,
 
 		wg.Wait()
 
-		assert.Equal(t, int32(1), count)
+		require.Equal(t, int32(1), count)
 	})
 
 	return
@@ -874,4 +896,18 @@ func result(output string, conclusion adagio.Node_Result_Conclusion) *adagio.Nod
 		Conclusion: conclusion,
 		Output:     data,
 	}
+}
+
+func newClaim() *adagio.Claim {
+	return &adagio.Claim{
+		Id: uuid.Must(uuid.NewV4()).String(),
+	}
+}
+
+func stripClaims(nodes []*adagio.Node) []*adagio.Node {
+	for _, n := range nodes {
+		n.Claim = nil
+	}
+
+	return nodes
 }

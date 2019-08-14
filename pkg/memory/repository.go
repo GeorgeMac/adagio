@@ -27,7 +27,11 @@ type (
 )
 
 type Repository struct {
-	runs map[string]runState
+	runs   map[string]runState
+	claims map[string]struct {
+		run  *adagio.Run
+		node *adagio.Node
+	}
 
 	listeners listenerSet
 	mu        sync.Mutex
@@ -37,7 +41,11 @@ type Repository struct {
 
 func New() *Repository {
 	return &Repository{
-		runs:      map[string]runState{},
+		runs: map[string]runState{},
+		claims: map[string]struct {
+			run  *adagio.Run
+			node *adagio.Node
+		}{},
 		listeners: listenerSet{},
 	}
 }
@@ -118,7 +126,7 @@ func (r *Repository) ListRuns() (runs []*adagio.Run, err error) {
 	return
 }
 
-func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
+func (r *Repository) ClaimNode(runID, name string, claim *adagio.Claim) (*adagio.Node, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -144,6 +152,12 @@ func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
 	// update node state to running
 	node.Status = adagio.Node_RUNNING
 	node.StartedAt = r.now().Format(time.RFC3339)
+	node.Claim = claim
+
+	r.claims[claim.Id] = struct {
+		run  *adagio.Run
+		node *adagio.Node
+	}{state.run, node}
 
 	return node, true, nil
 }
@@ -158,7 +172,7 @@ func (r *Repository) notifyReady(run *adagio.Run, node *adagio.Node) {
 	}
 }
 
-func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result) error {
+func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result, claim *adagio.Claim) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -180,6 +194,8 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result) 
 	if err != nil {
 		return errors.Wrapf(err, "finishing node %q", node)
 	}
+
+	delete(r.claims, claim.Id)
 
 	if result.Conclusion == adagio.Node_Result_SUCCESS {
 		return r.handleSuccess(state, node, outgoing, result)

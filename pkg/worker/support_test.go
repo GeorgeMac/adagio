@@ -37,23 +37,24 @@ func newRepository(subscriptionCount int, nodes ...*adagio.Node) repository {
 
 type claimCall struct {
 	runID, name string
+	claim       *adagio.Claim
 }
 
-func claims(count int, runID, name string) (calls []claimCall) {
+func claims(count int, runID, name string, claim *adagio.Claim) (calls []claimCall) {
 	calls = make([]claimCall, 0, count)
 	for i := 0; i < count; i++ {
-		calls = append(calls, claimCall{runID, name})
+		calls = append(calls, claimCall{runID, name, claim})
 	}
 
 	return
 }
 
-func (r *repository) ClaimNode(runID string, name string) (*adagio.Node, bool, error) {
+func (r *repository) ClaimNode(runID string, name string, claim *adagio.Claim) (*adagio.Node, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	// track claim called
-	r.claimCalls = append(r.claimCalls, claimCall{runID, name})
+	r.claimCalls = append(r.claimCalls, claimCall{runID, name, claim})
 
 	// get node if claimable
 	node, ok := r.nodes[name]
@@ -67,13 +68,14 @@ func (r *repository) ClaimNode(runID string, name string) (*adagio.Node, bool, e
 type finishCall struct {
 	runID, name string
 	result      *adagio.Node_Result
+	claim       *adagio.Claim
 }
 
-func (r *repository) FinishNode(runID string, name string, result *adagio.Node_Result) error {
+func (r *repository) FinishNode(runID string, name string, result *adagio.Node_Result, claim *adagio.Claim) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.finishCalls = append(r.finishCalls, finishCall{runID, name, result})
+	r.finishCalls = append(r.finishCalls, finishCall{runID, name, result, claim})
 
 	return nil
 }

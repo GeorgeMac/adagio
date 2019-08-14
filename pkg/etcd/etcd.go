@@ -136,7 +136,7 @@ func (r *Repository) ListRuns() (runs []*adagio.Run, err error) {
 	return
 }
 
-func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
+func (r *Repository) ClaimNode(runID, name string, claim *adagio.Claim) (*adagio.Node, bool, error) {
 	ctxt := context.Background()
 	run, err := r.getRun(ctxt, runID)
 	if err != nil {
@@ -157,7 +157,16 @@ func (r *Repository) ClaimNode(runID, name string) (*adagio.Node, bool, error) {
 		return nil, false, nil
 	}
 
-	cmps, ops, err := r.transition(ctxt, runID, node, adagio.Node_RUNNING, nil, nil)
+	// construct a lease which is kept-alive
+	leaseID, err := r.lease(claim.Id)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// set claim on node
+	node.Claim = claim
+
+	cmps, ops, err := r.transition(ctxt, runID, node, adagio.Node_RUNNING, nil, nil, clientv3.WithLease(leaseID))
 	if err != nil {
 		return nil, false, err
 	}
@@ -187,13 +196,12 @@ func (r *Repository) complete(ctxt context.Context, runID string, node *adagio.N
 	return cmps, ops, nil
 }
 
-func (r *Repository) transition(ctxt context.Context, runID string, node *adagio.Node, toStatus adagio.Node_Status, cmps []clientv3.Cmp, ops []clientv3.Op) ([]clientv3.Cmp, []clientv3.Op, error) {
+func (r *Repository) transition(ctxt context.Context, runID string, node *adagio.Node, toStatus adagio.Node_Status, cmps []clientv3.Cmp, ops []clientv3.Op, putOpts ...clientv3.OpOption) ([]clientv3.Cmp, []clientv3.Op, error) {
 	var (
 		nodeKey = r.ns.nodeKey(runID, node.Spec.Name)
 		fromKey = r.ns.nodeInStateKey(runID, statusToString(node.Status), node.Spec.Name)
 		toKey   = r.ns.nodeInStateKey(runID, statusToString(toStatus), node.Spec.Name)
 		from    = node.Status
-		putOpts []clientv3.OpOption
 	)
 
 	node.Status = toStatus
@@ -202,13 +210,6 @@ func (r *Repository) transition(ctxt context.Context, runID string, node *adagio
 	case adagio.Node_RUNNING:
 		node.StartedAt = r.now().Format(time.RFC3339)
 
-		// construct a lease which is kept-alive
-		leaseID, err := r.lease(toKey)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		putOpts = append(putOpts, clientv3.WithLease(leaseID))
 	case adagio.Node_COMPLETED:
 		now := r.now()
 		if node.StartedAt == "" {
@@ -259,12 +260,9 @@ func (r *Repository) transition(ctxt context.Context, runID string, node *adagio
 		), nil
 }
 
-func (r *Repository) lease(forKey string) (clientv3.LeaseID, error) {
+func (r *Repository) lease(claimID string) (clientv3.LeaseID, error) {
 	// store lease keep-alive cancel func
-	r.mu.Lock()
-	var ctxt context.Context
-	ctxt, r.leases[forKey] = context.WithCancel(context.Background())
-	r.mu.Unlock()
+	ctxt, cancel := context.WithCancel(context.Background())
 
 	// grant lease in seconds
 	leaseResp, err := r.leaser.Grant(ctxt, int64(r.ttl/time.Second))
@@ -272,9 +270,22 @@ func (r *Repository) lease(forKey string) (clientv3.LeaseID, error) {
 		return 0, err
 	}
 
+	r.mu.Lock()
+	r.leases[claimID] = func() {
+		// cancel keep-alive
+		cancel()
+
+		// revoke lease
+		if _, err := r.leaser.Revoke(context.Background(), leaseResp.ID); err != nil {
+			log.Println(claimID, err)
+			return
+		}
+	}
+	r.mu.Unlock()
+
 	// keep lease alive
 	go func() {
-		defer r.cancelLease(forKey)
+		defer r.cancelLease(claimID)
 
 		resps, err := r.leaser.KeepAlive(ctxt, leaseResp.ID)
 		if err != nil {
@@ -286,49 +297,23 @@ func (r *Repository) lease(forKey string) (clientv3.LeaseID, error) {
 			log.Println("keep-alive", resp.ID)
 		}
 
-		log.Println("finished keep-alive for", forKey)
+		log.Println("finished keep-alive for", claimID)
 	}()
 
 	return leaseResp.ID, nil
 }
 
-func (r *Repository) cancelLease(forKey string) {
+func (r *Repository) cancelLease(claimID string) {
 	// clear lease keep-alive
 	r.mu.Lock()
-	if cancel, ok := r.leases[forKey]; ok {
+	if cancel, ok := r.leases[claimID]; ok {
 		cancel()
-		delete(r.leases, forKey)
+		delete(r.leases, claimID)
 	}
 	r.mu.Unlock()
-
-	var (
-		ctxt      = context.Background()
-		resp, err = r.kv.Get(ctxt, forKey)
-	)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	if len(resp.Kvs) < 1 {
-		log.Println(forKey, "key not found")
-		return
-	}
-
-	// if it has a lease
-	if resp.Kvs[0].Lease < 1 {
-		log.Println(forKey, "zero lease id")
-		return
-	}
-
-	// revoke lease
-	if _, err := r.leaser.Revoke(ctxt, clientv3.LeaseID(resp.Kvs[0].Lease)); err != nil {
-		log.Println(forKey, err)
-		return
-	}
 }
 
-func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result) error {
+func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result, claim *adagio.Claim) error {
 	ctxt := context.Background()
 	run, err := r.getRun(ctxt, runID)
 	if err != nil {
@@ -373,10 +358,10 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result) 
 	}
 
 	if !resp.Succeeded {
-		return r.FinishNode(run.Id, node.Spec.Name, result)
+		return r.FinishNode(run.Id, node.Spec.Name, result, claim)
 	}
 
-	r.cancelLease(r.ns.nodeInStateKey(run.Id, "running", node.Spec.Name))
+	r.cancelLease(claim.Id)
 
 	return nil
 }

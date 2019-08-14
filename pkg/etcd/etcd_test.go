@@ -4,7 +4,6 @@ package etcd
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"testing"
 	"time"
@@ -29,10 +28,8 @@ func Test_Run_RepositoryTestHarness(t *testing.T) {
 
 	var (
 		repo     = New(cli.KV, cli.Watcher, cli.Lease, WithNamespace("adagio-test/"))
-		orphaner = repository.OrphanFunc(func(r *adagio.Run, s *adagio.Node_Spec) {
-			key := repo.ns.nodeInStateKey(r.Id, "running", s.Name)
-			fmt.Println("orphaner cancelling lease for", key)
-			repo.cancelLease(key)
+		orphaner = repository.OrphanFunc(func(c *adagio.Claim) {
+			repo.cancelLease(c.Id)
 		})
 	)
 
