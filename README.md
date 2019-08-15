@@ -1,7 +1,7 @@
 Adagio - A Workflow Orchestrator
 ----------------------------------
 
-[![CircleCI](https://circleci.com/gh/GeorgeMac/adagio.svg?style=svg)](https://circleci.com/gh/GeorgeMac/adagio)
+[![Github Actions](https://github.com/georgemac/adagio/workflows/Go/badge.svg)](https://github.com/GeorgeMac/adagio/actions)
 
 ![architecture](docs/architecture.svg)
 
