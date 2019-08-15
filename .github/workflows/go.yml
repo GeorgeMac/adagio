@@ -22,5 +22,5 @@ jobs:
 
     - name: Build and Test
       run: |
-        go build -v .
-        go test -v ./...
+        make install
+        make test
