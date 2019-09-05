@@ -4,9 +4,13 @@
 package controlplane
 
 import (
+	context "context"
 	fmt "fmt"
 	adagio "github.com/georgemac/adagio/pkg/adagio"
 	proto "github.com/golang/protobuf/proto"
+	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 	math "math"
 )
 
@@ -279,4 +283,156 @@ var fileDescriptor_44473a7dc25ad712 = []byte{
 	0x97, 0x9e, 0x83, 0xdf, 0xee, 0x8d, 0xce, 0x7a, 0x8d, 0x4e, 0x4b, 0x51, 0x32, 0x40, 0xd9, 0xd0,
 	0x9b, 0xe3, 0xe7, 0xa3, 0xbf, 0xae, 0xdb, 0xeb, 0xae, 0xb9, 0x35, 0x57, 0xdf, 0x01, 0x00, 0x00,
 	0xff, 0xff, 0xcc, 0x6d, 0x6b, 0x05, 0x8d, 0x02, 0x00, 0x00,
+}
+
+// Reference imports to suppress errors if they are not otherwise used.
+var _ context.Context
+var _ grpc.ClientConn
+
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the grpc package it is being compiled against.
+const _ = grpc.SupportPackageIsVersion4
+
+// ControlPlaneClient is the client API for ControlPlane service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
+type ControlPlaneClient interface {
+	Start(ctx context.Context, in *StartRequest, opts ...grpc.CallOption) (*StartResponse, error)
+	Inspect(ctx context.Context, in *InspectRequest, opts ...grpc.CallOption) (*InspectResponse, error)
+	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
+}
+
+type controlPlaneClient struct {
+	cc *grpc.ClientConn
+}
+
+func NewControlPlaneClient(cc *grpc.ClientConn) ControlPlaneClient {
+	return &controlPlaneClient{cc}
+}
+
+func (c *controlPlaneClient) Start(ctx context.Context, in *StartRequest, opts ...grpc.CallOption) (*StartResponse, error) {
+	out := new(StartResponse)
+	err := c.cc.Invoke(ctx, "/adagio.rpc.controlplane.ControlPlane/Start", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *controlPlaneClient) Inspect(ctx context.Context, in *InspectRequest, opts ...grpc.CallOption) (*InspectResponse, error) {
+	out := new(InspectResponse)
+	err := c.cc.Invoke(ctx, "/adagio.rpc.controlplane.ControlPlane/Inspect", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *controlPlaneClient) List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error) {
+	out := new(ListResponse)
+	err := c.cc.Invoke(ctx, "/adagio.rpc.controlplane.ControlPlane/List", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ControlPlaneServer is the server API for ControlPlane service.
+type ControlPlaneServer interface {
+	Start(context.Context, *StartRequest) (*StartResponse, error)
+	Inspect(context.Context, *InspectRequest) (*InspectResponse, error)
+	List(context.Context, *ListRequest) (*ListResponse, error)
+}
+
+// UnimplementedControlPlaneServer can be embedded to have forward compatible implementations.
+type UnimplementedControlPlaneServer struct {
+}
+
+func (*UnimplementedControlPlaneServer) Start(ctx context.Context, req *StartRequest) (*StartResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Start not implemented")
+}
+func (*UnimplementedControlPlaneServer) Inspect(ctx context.Context, req *InspectRequest) (*InspectResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Inspect not implemented")
+}
+func (*UnimplementedControlPlaneServer) List(ctx context.Context, req *ListRequest) (*ListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method List not implemented")
+}
+
+func RegisterControlPlaneServer(s *grpc.Server, srv ControlPlaneServer) {
+	s.RegisterService(&_ControlPlane_serviceDesc, srv)
+}
+
+func _ControlPlane_Start_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControlPlaneServer).Start(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/adagio.rpc.controlplane.ControlPlane/Start",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControlPlaneServer).Start(ctx, req.(*StartRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ControlPlane_Inspect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InspectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControlPlaneServer).Inspect(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/adagio.rpc.controlplane.ControlPlane/Inspect",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControlPlaneServer).Inspect(ctx, req.(*InspectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ControlPlane_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControlPlaneServer).List(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/adagio.rpc.controlplane.ControlPlane/List",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControlPlaneServer).List(ctx, req.(*ListRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+var _ControlPlane_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "adagio.rpc.controlplane.ControlPlane",
+	HandlerType: (*ControlPlaneServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Start",
+			Handler:    _ControlPlane_Start_Handler,
+		},
+		{
+			MethodName: "Inspect",
+			Handler:    _ControlPlane_Inspect_Handler,
+		},
+		{
+			MethodName: "List",
+			Handler:    _ControlPlane_List_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "pkg/rpc/controlplane/service.proto",
 }

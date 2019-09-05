@@ -4,16 +4,16 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
 
 	"github.com/georgemac/adagio/pkg/rpc/controlplane"
+	"google.golang.org/grpc"
 )
 
 func main() {
 	var (
 		fs   = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-		host = fs.String("host", "http://localhost:7890", "host address of adagio control plane")
+		host = fs.String("host", "localhost:7890", "host address of adagio control plane")
 		_    = fs.Bool("help", false, "print usage")
 	)
 
@@ -32,14 +32,14 @@ func main() {
 		exit(fs.Usage, 2)
 	}
 
-	var (
-		ctxt   = context.Background()
-		client = controlplane.NewControlPlaneProtobufClient(*host, &http.Client{})
-	)
+	conn, err := grpc.Dial(*host, grpc.WithInsecure())
+	exitIfError(err)
+
+	defer conn.Close()
 
 	switch fs.Arg(0) {
 	case "runs":
-		runs(ctxt, client, fs.Args())
+		runs(context.Background(), controlplane.NewControlPlaneClient(conn), fs.Args())
 	default:
 		exit(fs.Usage, 2)
 	}

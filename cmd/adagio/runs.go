@@ -17,7 +17,7 @@ import (
 	"github.com/georgemac/adagio/pkg/rpc/controlplane"
 )
 
-func runs(ctxt context.Context, client controlplane.ControlPlane, args []string) {
+func runs(ctxt context.Context, client controlplane.ControlPlaneClient, args []string) {
 	var (
 		fs = flag.NewFlagSet(args[0], flag.ExitOnError)
 		_  = fs.Bool("help", false, "print usage")
@@ -52,7 +52,7 @@ func runs(ctxt context.Context, client controlplane.ControlPlane, args []string)
 	}
 }
 
-func start(ctxt context.Context, client controlplane.ControlPlane, args ...string) {
+func start(ctxt context.Context, client controlplane.ControlPlaneClient, args ...string) {
 	var (
 		fs = flag.NewFlagSet(args[0], flag.ExitOnError)
 		q  = fs.Bool("q", false, "just print the run ID")
@@ -102,7 +102,7 @@ func start(ctxt context.Context, client controlplane.ControlPlane, args ...strin
 	fmt.Printf("Run started %q\n", resp.Run.Id)
 }
 
-func inspect(ctxt context.Context, client controlplane.ControlPlane, args ...string) {
+func inspect(ctxt context.Context, client controlplane.ControlPlaneClient, args ...string) {
 	var (
 		fs      = flag.NewFlagSet(args[0], flag.ExitOnError)
 		printer = fs.String("printer", "pretty", `printer to use ("pretty"|"spew"|"dot") (default "pretty")`)
@@ -203,7 +203,7 @@ func inspect(ctxt context.Context, client controlplane.ControlPlane, args ...str
 	fmt.Printf("%# v\n", formatter)
 }
 
-func list(ctxt context.Context, client controlplane.ControlPlane) {
+func list(ctxt context.Context, client controlplane.ControlPlaneClient) {
 	resp, err := client.List(ctxt, &controlplane.ListRequest{})
 	exitIfError(err)
 
