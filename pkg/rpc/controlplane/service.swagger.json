@@ -1,0 +1,312 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "pkg/rpc/controlplane/service.proto",
+    "version": "version not set"
+  },
+  "schemes": [
+    "http",
+    "https"
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v0/runs": {
+      "get": {
+        "operationId": "List",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/controlplaneListResponse"
+            }
+          }
+        },
+        "tags": [
+          "ControlPlane"
+        ]
+      },
+      "put": {
+        "operationId": "Start",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/controlplaneStartResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/controlplaneStartRequest"
+            }
+          }
+        ],
+        "tags": [
+          "ControlPlane"
+        ]
+      }
+    },
+    "/v0/runs/{id}": {
+      "get": {
+        "operationId": "Inspect",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/controlplaneInspectResponse"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "ControlPlane"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "NodeSpec": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "runtime": {
+          "type": "string"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/adagioMetadataValue"
+          }
+        },
+        "retry": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/SpecRetry"
+          }
+        }
+      }
+    },
+    "SpecRetry": {
+      "type": "object",
+      "properties": {
+        "max_attempts": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "adagioClaim": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/adagioMetadataValue"
+          }
+        }
+      }
+    },
+    "adagioEdge": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "destination": {
+          "type": "string"
+        }
+      }
+    },
+    "adagioGraphSpec": {
+      "type": "object",
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/NodeSpec"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/adagioEdge"
+          }
+        }
+      }
+    },
+    "adagioMetadataValue": {
+      "type": "object",
+      "properties": {
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "adagioNode": {
+      "type": "object",
+      "properties": {
+        "spec": {
+          "$ref": "#/definitions/NodeSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/adagioNodeStatus"
+        },
+        "attempts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/adagioNodeResult"
+          }
+        },
+        "started_at": {
+          "type": "string"
+        },
+        "finished_at": {
+          "type": "string"
+        },
+        "inputs": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "format": "byte"
+          }
+        },
+        "claim": {
+          "$ref": "#/definitions/adagioClaim"
+        }
+      }
+    },
+    "adagioNodeResult": {
+      "type": "object",
+      "properties": {
+        "conclusion": {
+          "$ref": "#/definitions/adagioNodeResultConclusion"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/adagioMetadataValue"
+          }
+        },
+        "output": {
+          "type": "string",
+          "format": "byte"
+        }
+      }
+    },
+    "adagioNodeResultConclusion": {
+      "type": "string",
+      "enum": [
+        "NONE",
+        "SUCCESS",
+        "FAIL",
+        "ERROR"
+      ],
+      "default": "NONE"
+    },
+    "adagioNodeStatus": {
+      "type": "string",
+      "enum": [
+        "NONE",
+        "WAITING",
+        "READY",
+        "RUNNING",
+        "COMPLETED"
+      ],
+      "default": "NONE"
+    },
+    "adagioRun": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/adagioNode"
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/adagioEdge"
+          }
+        },
+        "status": {
+          "$ref": "#/definitions/adagioRunStatus"
+        }
+      }
+    },
+    "adagioRunStatus": {
+      "type": "string",
+      "enum": [
+        "WAITING",
+        "RUNNING",
+        "COMPLETED"
+      ],
+      "default": "WAITING"
+    },
+    "controlplaneInspectResponse": {
+      "type": "object",
+      "properties": {
+        "run": {
+          "$ref": "#/definitions/adagioRun"
+        }
+      }
+    },
+    "controlplaneListResponse": {
+      "type": "object",
+      "properties": {
+        "runs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/adagioRun"
+          }
+        }
+      }
+    },
+    "controlplaneStartRequest": {
+      "type": "object",
+      "properties": {
+        "spec": {
+          "$ref": "#/definitions/adagioGraphSpec"
+        }
+      }
+    },
+    "controlplaneStartResponse": {
+      "type": "object",
+      "properties": {
+        "run": {
+          "$ref": "#/definitions/adagioRun"
+        }
+      }
+    }
+  }
+}

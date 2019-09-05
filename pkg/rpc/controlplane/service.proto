@@ -5,11 +5,27 @@ package adagio.rpc.controlplane;
 option go_package = "pkg/rpc/controlplane";
 
 import "pkg/adagio/adagio.proto";
+import "google/api/annotations.proto";
 
 service ControlPlane {
-  rpc Start(StartRequest) returns (StartResponse);
-  rpc Inspect(InspectRequest) returns (InspectResponse);
-  rpc List(ListRequest) returns (ListResponse);
+  rpc Start(StartRequest) returns (StartResponse) {
+    option (google.api.http) = {
+      put: "/v0/runs"
+      body: "*"
+    };
+  };
+
+  rpc List(ListRequest) returns (ListResponse) {
+    option (google.api.http) = {
+      get: "/v0/runs"
+    };
+  };
+
+  rpc Inspect(InspectRequest) returns (InspectResponse) {
+    option (google.api.http) = {
+      get: "/v0/runs/{id=*}"
+    };
+  };
 }
 
 message StartRequest {

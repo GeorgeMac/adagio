@@ -1,3 +1,5 @@
+gateway_path = "$$GOPATH/pkg/mod/$(shell go list -m github.com/grpc-ecosystem/grpc-gateway | head | sed 's/ /@/')"
+
 .PHONY: install
 install: ## Install adagio and adagiod
 	go install ./...
@@ -23,11 +25,14 @@ deps: ## Fetch and vendor dependencies
 .PHONY: protobuf
 protobuf: protobuf-deps ## Build protocol buffers into model and grpc service definitions
 	protoc --go_out=paths=source_relative:. ./pkg/adagio/adagio.proto
-	protoc -I. --go_out=plugins=grpc:. ./pkg/rpc/controlplane/service.proto
+	protoc -I. -I$(gateway_path)/third_party/googleapis --go_out=plugins=grpc:. ./pkg/rpc/controlplane/service.proto
+	protoc -I. -I$(gateway_path)/third_party/googleapis --grpc-gateway_out=logtostderr=true:. ./pkg/rpc/controlplane/service.proto
+	protoc -I. -I$(gateway_path)/third_party/googleapis --swagger_out=logtostderr=true:. ./pkg/rpc/controlplane/service.proto
 
 protobuf-deps: ## Fetch protobuf dependencies
 	@go get github.com/golang/protobuf/{proto,protoc-gen-go}
 	@go get google.golang.org/grpc
+	@go get github.com/grpc-ecosystem/grpc-gateway
 
 .PHONY: docker-build
 docker-build: ## Build docker images
