@@ -1,20 +1,20 @@
 .PHONY: install
 install: ## Install adagio and adagiod
-	go install -mod=vendor ./...
+	go install ./...
 
 .PHONY: build
 build: ## Build adagio and adagiod into local bin dir
 	@mkdir -p bin/
-	go build -mod=vendor -o bin/adagio  cmd/adagio/*.go
-	go build -mod=vendor -o bin/adagiod cmd/adagiod/*.go
+	go build -o bin/adagio  cmd/adagio/*.go
+	go build -o bin/adagiod cmd/adagiod/*.go
 
 .PHONY: test
 test: ## Run test suite
-	go test -cover -race -mod=vendor ./...
+	go test -cover -race ./...
 
 .PHONY: test-with-integrations
 test-with-integrations: ## Run test suite with integrations (i.e. etcd)
-	go test -cover -count 5 -race -mod=vendor -tags etcd ./...
+	go test -cover -count 5 -race -tags etcd ./...
 
 .PHONY: deps
 deps: ## Fetch and vendor dependencies
