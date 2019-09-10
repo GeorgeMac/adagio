@@ -35,11 +35,16 @@ This daemon service consists of the adagio control plan API and the worker proce
 
 # Building
 
-
 ```
-make help      # Print description of the commands available
-make install   # Install adagio and adagiod
-make protobuf  # Build protocol buffers into twirp model and service definitions
+➜  make
+install                        Install adagio and adagiod
+build                          Build adagio and adagiod into local bin dir
+test                           Run test suite
+test-with-integrations         Run test suite with integrations (i.e. etcd)
+deps                           Fetch and vendor dependencies
+protobuf                       Build protocol buffers into model and grpc service definitions
+protobuf-deps                  Fetch protobuf dependencies
+docker-build                   Build docker images
 ```
 
 see `make help` for details locally.

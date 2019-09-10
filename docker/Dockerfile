@@ -1,6 +1,6 @@
 FROM golang:1.12-alpine AS base
 
-RUN apk update && apk add make
+RUN apk update && apk add make git
 
 WORKDIR /workspace
 

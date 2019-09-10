@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"net/http"
+	"net"
 	"os"
 	"os/signal"
 	"strings"
@@ -25,6 +25,7 @@ import (
 	"github.com/peterbourgon/ff"
 	"github.com/peterbourgon/ff/fftoml"
 	"go.etcd.io/etcd/clientv3"
+	"google.golang.org/grpc"
 )
 
 type Repository interface {
@@ -122,24 +123,27 @@ func main() {
 
 func api(ctxt context.Context, repo controlservice.Repository) {
 	var (
-		service = controlservice.New(repo)
-		mux     = controlplane.NewControlPlaneServer(service, nil)
-		addr    = ":7890"
-		server  = &http.Server{
-			Addr:    addr,
-			Handler: mux,
-		}
+		service       = controlservice.New(repo)
+		addr          = ":7890"
+		grpcServer    = grpc.NewServer()
+		listener, err = net.Listen("tcp", addr)
 	)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	controlplane.RegisterControlPlaneServer(grpcServer, service)
 
 	log.Printf("Control plane listening on %q\n", addr)
 
 	go func() {
 		<-ctxt.Done()
 
-		server.Shutdown(context.Background())
+		grpcServer.GracefulStop()
 	}()
 
-	if err := server.ListenAndServe(); err != nil {
+	if err := grpcServer.Serve(listener); err != nil {
 		log.Println(err)
 	}
 }

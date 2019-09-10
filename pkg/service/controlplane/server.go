@@ -8,6 +8,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+var _ controlplane.ControlPlaneServer = (*Service)(nil)
+
 type Repository interface {
 	StartRun(*adagio.GraphSpec) (*adagio.Run, error)
 	InspectRun(id string) (*adagio.Run, error)
