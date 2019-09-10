@@ -9,6 +9,7 @@ build: ## Build adagio and adagiod into local bin dir
 	@mkdir -p bin/
 	go build -o bin/adagio  cmd/adagio/*.go
 	go build -o bin/adagiod cmd/adagiod/*.go
+	go build -o bin/adagiogw cmd/adagiogw/*.go
 
 .PHONY: test
 test: ## Run test suite

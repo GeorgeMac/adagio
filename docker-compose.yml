@@ -31,6 +31,17 @@ services:
       - -etcd-addresses=http://etcd:2379
       - agent
     restart: always
+  gateway:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command:
+      - adagiogw
+      - -adagiod-addr=api:7890
+    depends_on:
+      - api
+    ports:
+      - "7891:7891"
   etcd:
     image: gcr.io/etcd-development/etcd:v3.3
     command:
