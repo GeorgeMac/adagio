@@ -9,6 +9,7 @@ services:
       - -backend-type=etcd
       - -etcd-addresses=http://etcd:2379
       - api
+    restart: always
     ports:
       - "7890:7890"
   agent_one:
@@ -38,10 +39,20 @@ services:
     command:
       - adagiogw
       - -adagiod-addr=api:7890
+    volumes:
+      - "./ui/:/ui/"
     depends_on:
       - api
     ports:
       - "7891:7891"
+  ui:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.ui
+    ports:
+      - "8080:8080"
+    depends_on:
+      - gateway
   etcd:
     image: gcr.io/etcd-development/etcd:v3.3
     command:
