@@ -108,6 +108,8 @@ func Pretty(pbrun *adagio.Run) (fmt.Formatter, error) {
 
 func statusToString(state adagio.Node_Status) (string, error) {
 	switch state {
+	case adagio.Node_NONE:
+		return "orphaned", nil
 	case adagio.Node_WAITING:
 		return "waiting", nil
 	case adagio.Node_READY:
@@ -117,7 +119,7 @@ func statusToString(state adagio.Node_Status) (string, error) {
 	case adagio.Node_COMPLETED:
 		return "completed", nil
 	default:
-		return "", errors.New("state not recognized")
+		return "", errors.New("status not recognized")
 	}
 }
 

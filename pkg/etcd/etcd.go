@@ -193,10 +193,13 @@ func (r *Repository) ClaimNode(runID, name string, claim *adagio.Claim) (node *a
 }
 
 func (r *Repository) complete(ctxt context.Context, runID string, node *adagio.Node, cmps []clientv3.Cmp, ops []clientv3.Op) ([]clientv3.Cmp, []clientv3.Op, error) {
-	var err error
-	cmps, ops, err = r.transition(ctxt, runID, node, adagio.Node_COMPLETED, cmps, ops)
-	if err != nil {
-		return nil, nil, err
+	// given node has not already been completed
+	if node.Status != adagio.Node_COMPLETED {
+		var err error
+		cmps, ops, err = r.transition(ctxt, runID, node, adagio.Node_COMPLETED, cmps, ops)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	return cmps, ops, nil
@@ -360,6 +363,8 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result, 
 		Then(ops...).
 		Commit()
 	if err != nil {
+		r.cancelLease(claim.Id)
+
 		return err
 	}
 
