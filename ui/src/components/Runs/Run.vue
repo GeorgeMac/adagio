@@ -32,7 +32,10 @@ export default {
   mounted() {
     this.getRun(true);
 
-    setInterval((function() { this.getRun(false) }).bind(this), 500);
+    this.intervalID = setInterval((function() { this.getRun(false) }).bind(this), 500);
+  },
+  beforeDestroy() {
+    clearInterval(this.intervalID);
   },
   methods: {
     getRun(first) {

@@ -7,10 +7,10 @@ import router from './router';
 
 import { library } from '@fortawesome/fontawesome-svg-core';
 // internal icons
-import { faCheck, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faCheck, faPlus, faArrowUp } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 
-library.add(faCheck, faPlus);
+library.add(faCheck, faPlus, faArrowUp);
 Vue.component('vue-fontawesome', FontAwesomeIcon);
 
 Vue.config.productionTip = false
@@ -20,8 +20,8 @@ Vue.use(Buefy, {
   customIconPacks: {
     fas: {
       sizes: {
-        default: "lg",
-        "is-small": "",
+        default: "1x",
+        "is-small": "1x",
         "is-medium": "2x",
         "is-large": "3x"
       },
