@@ -1,6 +1,4 @@
-![Adagio Logo](ui/src/assets/images/logo.png)
-
-Adagio - A Workflow Orchestrator
+![Adagio Logo](ui/src/assets/images/logo.png) Adagio - A Workflow Orchestrator
 ------------------------------------------------------------------------------
 
 [![Github Actions](https://github.com/georgemac/adagio/workflows/Go/badge.svg)](https://github.com/GeorgeMac/adagio/actions)
