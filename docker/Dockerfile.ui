@@ -5,12 +5,14 @@ RUN mkdir /ui
 ADD ./ui/package.json /ui/.
 ADD ./ui/yarn.lock /ui/.
 ADD ./ui/babel.config.js /ui/.
+ADD ./ui/vue.config.js /ui/.
 
 WORKDIR /ui
 
 RUN yarn install
 
 ADD ./ui/src /ui/src
+ADD ./ui/public /ui/public
 
 ADD ./pkg/rpc/controlplane/service.swagger.json /pkg/rpc/controlplane/service.swagger.json
 

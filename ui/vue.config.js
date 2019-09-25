@@ -7,7 +7,10 @@ module.exports = {
       new FaviconsWebpackPlugin({
         logo: './src/assets/images/logo.png',
         inject: true,
-        title: 'Adagio'
+        favicons: {
+          appName: 'Adagio',
+          appDescription: 'The Workflow Engine'
+        }
       })
     ]
   }
