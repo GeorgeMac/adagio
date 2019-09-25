@@ -78,6 +78,22 @@
           "ControlPlane"
         ]
       }
+    },
+    "/v0/stats": {
+      "get": {
+        "operationId": "Stats",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/controlplaneStatsResponse"
+            }
+          }
+        },
+        "tags": [
+          "ControlPlane"
+        ]
+      }
     }
   },
   "definitions": {
@@ -110,6 +126,27 @@
         "max_attempts": {
           "type": "integer",
           "format": "int32"
+        }
+      }
+    },
+    "StatsNodeCounts": {
+      "type": "object",
+      "properties": {
+        "waiting_count": {
+          "type": "string",
+          "format": "int64"
+        },
+        "ready_count": {
+          "type": "string",
+          "format": "int64"
+        },
+        "running_count": {
+          "type": "string",
+          "format": "int64"
+        },
+        "completed_count": {
+          "type": "string",
+          "format": "int64"
         }
       }
     },
@@ -273,6 +310,18 @@
       ],
       "default": "WAITING"
     },
+    "adagioStats": {
+      "type": "object",
+      "properties": {
+        "run_count": {
+          "type": "string",
+          "format": "int64"
+        },
+        "node_counts": {
+          "$ref": "#/definitions/StatsNodeCounts"
+        }
+      }
+    },
     "controlplaneInspectResponse": {
       "type": "object",
       "properties": {
@@ -305,6 +354,14 @@
       "properties": {
         "run": {
           "$ref": "#/definitions/adagioRun"
+        }
+      }
+    },
+    "controlplaneStatsResponse": {
+      "type": "object",
+      "properties": {
+        "stats": {
+          "$ref": "#/definitions/adagioStats"
         }
       }
     }

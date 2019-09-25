@@ -3,7 +3,7 @@
     <header>
       <b-navbar>
         <template slot="brand">
-          <b-navbar-item tag="router-link" :to="{ path: '/' }">
+          <b-navbar-item tag="router-link" :to="{ name: 'home' }">
             <strong>ADAGIO</strong>
           </b-navbar-item>
         </template>

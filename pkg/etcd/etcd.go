@@ -53,6 +53,46 @@ func New(kv clientv3.KV, watcher clientv3.Watcher, leaser clientv3.Lease, opts .
 	return r
 }
 
+func (r *Repository) Stats() (*adagio.Stats, error) {
+	stats := &adagio.Stats{
+		NodeCounts: &adagio.Stats_NodeCounts{},
+	}
+
+	resp, err := r.kv.Get(context.Background(),
+		r.ns.runs(),
+		clientv3.WithPrefix(),
+		clientv3.WithCountOnly())
+	if err != nil {
+		return nil, err
+	}
+
+	stats.RunCount = resp.Count
+
+	for status := range adagio.Node_Status_name {
+		resp, err := r.kv.Get(context.Background(),
+			r.ns.nodesInStateKey(adagio.Node_Status(status)),
+			clientv3.WithPrefix(),
+			clientv3.WithCountOnly(),
+			clientv3.WithRev(resp.Header.Revision))
+		if err != nil {
+			return nil, err
+		}
+
+		switch adagio.Node_Status(status) {
+		case adagio.Node_WAITING:
+			stats.NodeCounts.WaitingCount = resp.Count
+		case adagio.Node_READY:
+			stats.NodeCounts.ReadyCount = resp.Count
+		case adagio.Node_RUNNING:
+			stats.NodeCounts.RunningCount = resp.Count
+		case adagio.Node_COMPLETED:
+			stats.NodeCounts.CompletedCount = resp.Count
+		}
+	}
+
+	return stats, nil
+}
+
 func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err error) {
 	run, err = adagio.NewRun(spec)
 	if err != nil {
@@ -711,11 +751,15 @@ func (n namespace) runKey(run *adagio.Run) string {
 }
 
 func (n namespace) allNodesKey(run *adagio.Run) string {
-	return fmt.Sprintf("%sruns/%s/node/", n, run.Id)
+	return fmt.Sprintf("%snodes/%s/node/", n, run.Id)
 }
 
 func (n namespace) nodeKey(runID, name string) string {
-	return fmt.Sprintf("%sruns/%s/node/%s", n, runID, name)
+	return fmt.Sprintf("%snodes/%s/node/%s", n, runID, name)
+}
+
+func (n namespace) nodesInStateKey(status adagio.Node_Status) string {
+	return fmt.Sprintf("%sstates/%s", n, statusToString(status))
 }
 
 func (n namespace) nodeInStateKey(runID, state, name string) string {

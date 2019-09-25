@@ -10,8 +10,6 @@ services:
       - -etcd-addresses=http://etcd:2379
       - api
     restart: always
-    ports:
-      - "7890:7890"
   agent_one:
     build:
       context: .
@@ -43,8 +41,6 @@ services:
       - "./ui/:/ui/"
     depends_on:
       - api
-    ports:
-      - "7891:7891"
   ui:
     build:
       context: .
@@ -63,5 +59,3 @@ services:
       - -listen-client-urls=http://0.0.0.0:2379
       - -listen-peer-urls=http://0.0.0.0:2380
       - -initial-cluster=etcd1=http://0.0.0.0:2380
-    ports:
-      - "2379:2379"

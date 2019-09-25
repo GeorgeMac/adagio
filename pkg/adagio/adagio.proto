@@ -101,3 +101,15 @@ message Claim {
   string id = 1;
   map<string, MetadataValue> metadata = 2;
 }
+
+message Stats {
+  message NodeCounts {
+    int64 waiting_count = 1;
+    int64 ready_count = 2;
+    int64 running_count = 3;
+    int64 completed_count = 4;
+  }
+
+  int64 run_count = 1;
+  NodeCounts node_counts = 2;
+}

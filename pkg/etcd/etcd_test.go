@@ -1,9 +1,8 @@
-// +build etcd
-
 package etcd
 
 import (
 	"context"
+	"flag"
 	"log"
 	"testing"
 	"time"
@@ -13,7 +12,13 @@ import (
 	"go.etcd.io/etcd/clientv3"
 )
 
+var integration = flag.Bool("integration", false, "enable integration tests")
+
 func Test_Run_RepositoryTestHarness(t *testing.T) {
+	if !*integration {
+		t.Skip("integration tests disabled")
+	}
+
 	cli, err := clientv3.New(clientv3.Config{Endpoints: []string{"http://127.0.0.1:2379"}})
 	if err != nil {
 		log.Fatal(err)

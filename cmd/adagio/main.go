@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"text/tabwriter"
 
 	"github.com/georgemac/adagio/pkg/rpc/controlplane"
 	"google.golang.org/grpc"
@@ -40,9 +41,42 @@ func main() {
 	switch fs.Arg(0) {
 	case "runs":
 		runs(context.Background(), controlplane.NewControlPlaneClient(conn), fs.Args())
+	case "stats":
+		stats(context.Background(), controlplane.NewControlPlaneClient(conn), fs.Args())
 	default:
 		exit(fs.Usage, 2)
 	}
+}
+
+func stats(ctxt context.Context, client controlplane.ControlPlaneClient, args []string) {
+	var (
+		fs = flag.NewFlagSet(args[0], flag.ExitOnError)
+		_  = fs.Bool("help", false, "print usage")
+	)
+
+	fs.Usage = func() {
+		fmt.Println()
+		fmt.Print("Usage: adagio stats [OPTIONS]\n\n")
+		fmt.Println("Options:")
+		fs.PrintDefaults()
+	}
+
+	fs.Parse(args[1:])
+
+	resp, err := client.Stats(ctxt, &controlplane.StatsRequest{})
+	exitIfError(err)
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)
+
+	stats := resp.Stats
+
+	fmt.Fprintf(w, "runs\t%d\t\n", stats.RunCount)
+	fmt.Fprintf(w, "nodes waiting\t%d\t\n", stats.NodeCounts.WaitingCount)
+	fmt.Fprintf(w, "nodes ready\t%d\t\n", stats.NodeCounts.ReadyCount)
+	fmt.Fprintf(w, "nodes running\t%d\t\n", stats.NodeCounts.RunningCount)
+	fmt.Fprintf(w, "nodes completed\t%d\t\n", stats.NodeCounts.CompletedCount)
+
+	w.Flush()
 }
 
 func exitIfError(err error) {

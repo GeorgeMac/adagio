@@ -7,13 +7,15 @@ import (
 
 	"github.com/georgemac/adagio/pkg/adagio"
 	"github.com/georgemac/adagio/pkg/graph"
+	"github.com/georgemac/adagio/pkg/service/controlplane"
 	"github.com/georgemac/adagio/pkg/worker"
 	"github.com/pkg/errors"
 )
 
 var (
 	// compile time check to ensure Repository is a worker.Repository
-	_ worker.Repository = (*Repository)(nil)
+	_ worker.Repository       = (*Repository)(nil)
+	_ controlplane.Repository = (*Repository)(nil)
 )
 
 type (
@@ -48,6 +50,33 @@ func New() *Repository {
 		}{},
 		listeners: listenerSet{},
 	}
+}
+
+func (r *Repository) Stats() (*adagio.Stats, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	nodeCounts := &adagio.Stats_NodeCounts{}
+
+	for _, runState := range r.runs {
+		for _, node := range runState.lookup {
+			switch node.Status {
+			case adagio.Node_WAITING:
+				nodeCounts.WaitingCount++
+			case adagio.Node_READY:
+				nodeCounts.ReadyCount++
+			case adagio.Node_RUNNING:
+				nodeCounts.RunningCount++
+			case adagio.Node_COMPLETED:
+				nodeCounts.CompletedCount++
+			}
+		}
+	}
+
+	return &adagio.Stats{
+		RunCount:   int64(len(r.runs)),
+		NodeCounts: nodeCounts,
+	}, nil
 }
 
 func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err error) {

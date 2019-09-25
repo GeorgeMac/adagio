@@ -29,7 +29,7 @@ func run() error {
 		return err
 	}
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.ListenAndServe(":7891", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, PATCH, POST, DELETE")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
@@ -39,9 +39,7 @@ func run() error {
 		}
 
 		mux.ServeHTTP(w, r)
-	})
-
-	return http.ListenAndServe(":7891", handler)
+	}))
 }
 
 func main() {

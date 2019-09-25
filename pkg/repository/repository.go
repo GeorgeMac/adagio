@@ -662,6 +662,18 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 			}, stripClaims(runs[4].Nodes))
 		})
 	})
+
+	t.Run("a call to stats reports as expected", func(t *testing.T) {
+		stats, err := repo.Stats()
+		require.Nil(t, err)
+
+		assert.Equal(t, &adagio.Stats{
+			RunCount: 5,
+			NodeCounts: &adagio.Stats_NodeCounts{
+				CompletedCount: 23,
+			},
+		}, stats)
+	})
 }
 
 type TestLayer struct {
