@@ -204,7 +204,7 @@ func inspect(ctxt context.Context, client controlplane.ControlPlaneClient, args 
 }
 
 func list(ctxt context.Context, client controlplane.ControlPlaneClient) {
-	resp, err := client.List(ctxt, &controlplane.ListRequest{})
+	resp, err := client.ListRuns(ctxt, &controlplane.ListRequest{})
 	exitIfError(err)
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 4, ' ', 0)

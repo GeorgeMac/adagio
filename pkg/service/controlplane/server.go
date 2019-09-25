@@ -15,6 +15,7 @@ type Repository interface {
 	StartRun(*adagio.GraphSpec) (*adagio.Run, error)
 	InspectRun(id string) (*adagio.Run, error)
 	ListRuns() ([]*adagio.Run, error)
+	ListAgents() ([]*adagio.Agent, error)
 }
 
 type Service struct {
@@ -56,11 +57,20 @@ func (s *Service) Inspect(_ context.Context, req *controlplane.InspectRequest) (
 	return &controlplane.InspectResponse{Run: run}, nil
 }
 
-func (s *Service) List(_ context.Context, _ *controlplane.ListRequest) (*controlplane.ListResponse, error) {
+func (s *Service) ListRuns(_ context.Context, _ *controlplane.ListRequest) (*controlplane.ListRunsResponse, error) {
 	runs, err := s.repo.ListRuns()
 	if err != nil {
 		return nil, errors.Wrap(err, "control plane: listing runs")
 	}
 
-	return &controlplane.ListResponse{Runs: runs}, nil
+	return &controlplane.ListRunsResponse{Runs: runs}, nil
+}
+
+func (s *Service) ListAgents(_ context.Context, _ *controlplane.ListRequest) (*controlplane.ListAgentsResponse, error) {
+	agents, err := s.repo.ListAgents()
+	if err != nil {
+		return nil, errors.Wrap(err, "control place: listing agents")
+	}
+
+	return &controlplane.ListAgentsResponse{Agents: agents}, nil
 }

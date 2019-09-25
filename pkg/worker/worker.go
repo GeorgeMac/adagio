@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"math/rand"
+	"sort"
 	"sync"
 	"time"
 
@@ -24,7 +25,8 @@ var (
 type Repository interface {
 	ClaimNode(runID, name string, claim *adagio.Claim) (*adagio.Node, bool, error)
 	FinishNode(runID, name string, result *adagio.Node_Result, claim *adagio.Claim) error
-	Subscribe(events chan<- *adagio.Event, types ...adagio.Event_Type) error
+	Subscribe(agent *adagio.Agent, events chan<- *adagio.Event, types ...adagio.Event_Type) error
+	UnsubscribeAll(*adagio.Agent, chan<- *adagio.Event) error
 }
 
 // Runtime is a type which can execute a node and produce a result
@@ -86,12 +88,28 @@ func NewPool(repo Repository, runtimes map[string]Runtime, opts ...Option) *Pool
 // Run begins the configured number of workers and responds to cancelation
 // of the supplied context
 func (p *Pool) Run(ctxt context.Context) {
-	var wg sync.WaitGroup
+	var (
+		entropy  = ulid.Monotonic(rand.New(rand.NewSource(time.Now().UnixNano())), 0)
+		runtimes = []*adagio.Runtime{}
+		wg       sync.WaitGroup
+	)
+
+	for runtime := range p.runtimes {
+		runtimes = append(runtimes, &adagio.Runtime{Name: runtime})
+	}
+
+	sort.Slice(runtimes, func(i, j int) bool {
+		return runtimes[i].Name < runtimes[j].Name
+	})
 
 	for i := 0; i < p.size; i++ {
-		wg.Add(1)
+		agent := &adagio.Agent{
+			Id:       ulid.MustNew(ulid.Timestamp(time.Now().UTC()), entropy).String(),
+			Runtimes: runtimes,
+		}
 
-		go func() {
+		wg.Add(1)
+		go func(agent *adagio.Agent) {
 			defer wg.Done()
 
 			var (
@@ -99,7 +117,7 @@ func (p *Pool) Run(ctxt context.Context) {
 				claimer = p.newClaimer()
 			)
 
-			p.repo.Subscribe(events, adagio.Event_NODE_READY, adagio.Event_NODE_ORPHANED)
+			p.repo.Subscribe(agent, events, adagio.Event_NODE_READY, adagio.Event_NODE_ORPHANED)
 
 			for {
 				select {
@@ -112,7 +130,7 @@ func (p *Pool) Run(ctxt context.Context) {
 					return
 				}
 			}
-		}()
+		}(agent)
 	}
 
 	wg.Wait()

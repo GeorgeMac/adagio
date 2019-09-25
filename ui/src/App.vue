@@ -12,7 +12,7 @@
           <b-navbar-item tag="router-link" :to="{ name: 'runs' }">
             Runs
           </b-navbar-item>
-          <b-navbar-item href="#">
+          <b-navbar-item tag="router-link" :to="{ name: 'agents' }">
             Agents
           </b-navbar-item>
 

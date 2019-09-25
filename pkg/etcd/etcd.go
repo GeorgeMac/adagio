@@ -12,12 +12,14 @@ import (
 
 	"github.com/georgemac/adagio/pkg/adagio"
 	"github.com/georgemac/adagio/pkg/graph"
+	"github.com/georgemac/adagio/pkg/service/controlplane"
 	"github.com/georgemac/adagio/pkg/worker"
 	"go.etcd.io/etcd/clientv3"
 )
 
 var (
-	_ worker.Repository = (*Repository)(nil)
+	_ worker.Repository       = (*Repository)(nil)
+	_ controlplane.Repository = (*Repository)(nil)
 )
 
 type Repository struct {
@@ -31,8 +33,9 @@ type Repository struct {
 	ns  namespace
 	now func() time.Time
 
-	ttl    time.Duration
-	leases map[string]func()
+	ttl     time.Duration
+	leases  map[string]func()
+	leaseMu sync.Mutex
 }
 
 func New(kv clientv3.KV, watcher clientv3.Watcher, leaser clientv3.Lease, opts ...Option) *Repository {
@@ -40,7 +43,6 @@ func New(kv clientv3.KV, watcher clientv3.Watcher, leaser clientv3.Lease, opts .
 		kv:            kv,
 		watcher:       watcher,
 		leaser:        leaser,
-		mu:            sync.Mutex{},
 		subscriptions: map[chan<- *adagio.Event]chan struct{}{},
 		now:           func() time.Time { return time.Now().UTC() },
 		ns:            namespace("v0/"),
@@ -147,6 +149,25 @@ func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err erro
 
 func (r *Repository) InspectRun(id string) (*adagio.Run, error) {
 	return r.getRun(context.Background(), id)
+}
+
+func (r *Repository) ListAgents() (agents []*adagio.Agent, err error) {
+	ctxt := context.Background()
+	resp, err := r.kv.Get(ctxt, r.ns.agents(), clientv3.WithPrefix())
+	if err != nil {
+		return nil, err
+	}
+
+	for _, kv := range resp.Kvs {
+		var agent adagio.Agent
+		if err := json.Unmarshal(kv.Value, &agent); err != nil {
+			return nil, err
+		}
+
+		agents = append(agents, &agent)
+	}
+
+	return
 }
 
 func (r *Repository) ListRuns() (runs []*adagio.Run, err error) {
@@ -319,7 +340,7 @@ func (r *Repository) lease(claimID string) (clientv3.LeaseID, error) {
 		return 0, err
 	}
 
-	r.mu.Lock()
+	r.leaseMu.Lock()
 	r.leases[claimID] = func() {
 		// cancel keep-alive
 		cancel()
@@ -330,7 +351,7 @@ func (r *Repository) lease(claimID string) (clientv3.LeaseID, error) {
 			return
 		}
 	}
-	r.mu.Unlock()
+	r.leaseMu.Unlock()
 
 	// keep lease alive
 	go func() {
@@ -354,12 +375,12 @@ func (r *Repository) lease(claimID string) (clientv3.LeaseID, error) {
 
 func (r *Repository) cancelLease(claimID string) {
 	// clear lease keep-alive
-	r.mu.Lock()
+	r.leaseMu.Lock()
 	if cancel, ok := r.leases[claimID]; ok {
 		cancel()
 		delete(r.leases, claimID)
 	}
-	r.mu.Unlock()
+	r.leaseMu.Unlock()
 }
 
 func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result, claim *adagio.Claim) error {
@@ -505,15 +526,33 @@ func (r *Repository) handleFailure(ctxt context.Context, run *adagio.Run, node *
 	return cmps, ops, nil
 }
 
-func (r *Repository) Subscribe(events chan<- *adagio.Event, typ ...adagio.Event_Type) error {
+func (r *Repository) Subscribe(agent *adagio.Agent, events chan<- *adagio.Event, typ ...adagio.Event_Type) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	// construct a lease for the agent
+	leaseID, err := r.lease(agent.Id)
+	if err != nil {
+		return err
+	}
+
+	// persist agent in keyspace
+	agentData, err := json.Marshal(agent)
+	if err != nil {
+		return err
+	}
+
+	if _, err := r.kv.Put(context.Background(), r.ns.agent(agent), string(agentData), clientv3.WithLease(leaseID)); err != nil {
+		return err
+	}
 
 	ch := make(chan struct{})
 
 	r.subscriptions[events] = ch
 
 	go func() {
+		defer r.cancelLease(agent.Id)
+
 		watch := r.watcher.Watch(context.Background(), r.ns.states(), clientv3.WithPrefix())
 		for {
 			var resp clientv3.WatchResponse
@@ -723,9 +762,18 @@ func (r *Repository) setInputs(ctxt context.Context, run *adagio.Run, node *adag
 	return nil
 }
 
-func (r *Repository) UnsubscribeAll(ch chan<- *adagio.Event) error {
+func (r *Repository) UnsubscribeAll(agent *adagio.Agent, ch chan<- *adagio.Event) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	// delete agent key before the
+	_, err := r.kv.Delete(context.Background(), r.ns.agent(agent))
+	if err != nil {
+		return err
+	}
+
+	// release agent key lease when possible
+	r.cancelLease(agent.Id)
 
 	if signal, ok := r.subscriptions[ch]; ok {
 		signal <- struct{}{}
@@ -744,6 +792,14 @@ func (n namespace) runs() string {
 
 func (n namespace) states() string {
 	return string(n) + "states/"
+}
+
+func (n namespace) agents() string {
+	return string(n) + "agents/"
+}
+
+func (n namespace) agent(agent *adagio.Agent) string {
+	return fmt.Sprintf("%sagents/%s", n, agent.Id)
 }
 
 func (n namespace) runKey(run *adagio.Run) string {
