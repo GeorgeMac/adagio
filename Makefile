@@ -17,7 +17,7 @@ test: ## Run test suite
 
 .PHONY: test-with-integrations
 test-with-integrations: ## Run test suite with integrations (i.e. etcd)
-	go test -cover -count 5 -race -integration ./...
+	@hack/integration-test.sh
 
 .PHONY: deps
 deps: ## Fetch and vendor dependencies

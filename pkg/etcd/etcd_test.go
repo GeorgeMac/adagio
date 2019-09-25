@@ -12,7 +12,7 @@ import (
 	"go.etcd.io/etcd/clientv3"
 )
 
-var integration = flag.Bool("integration", false, "enable integration tests")
+var integration = flag.Bool("adagio.integration", false, "enable integration tests")
 
 func Test_Run_RepositoryTestHarness(t *testing.T) {
 	if !*integration {
