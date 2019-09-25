@@ -35,7 +35,7 @@ export default {
         return
       }
 
-      d3.select("div.container svg").remove();
+      d3.select("div.container svg#graph").remove();
 
       // Create the input graph
       var g = new dagreD3.graphlib.Graph()
@@ -84,6 +84,7 @@ export default {
 
       var container = document.getElementById(this.run.id);
       var svg = d3.select(container).append("svg");
+      svg.attr("id", "graph");
       var svgGroup = svg.append("g");
 
       // Run the renderer. This is what draws the final graph.
