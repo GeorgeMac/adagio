@@ -1,0 +1,5 @@
+localhost:8080 {
+  proxy /v0 gateway:7891
+
+  root /app
+}

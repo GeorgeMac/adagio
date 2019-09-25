@@ -11,6 +11,7 @@ import (
 var _ controlplane.ControlPlaneServer = (*Service)(nil)
 
 type Repository interface {
+	Stats() (*adagio.Stats, error)
 	StartRun(*adagio.GraphSpec) (*adagio.Run, error)
 	InspectRun(id string) (*adagio.Run, error)
 	ListRuns() ([]*adagio.Run, error)
@@ -26,6 +27,15 @@ func New(repo Repository) *Service {
 	}
 
 	return s
+}
+
+func (s *Service) Stats(_ context.Context, req *controlplane.StatsRequest) (*controlplane.StatsResponse, error) {
+	stats, err := s.repo.Stats()
+	if err != nil {
+		return nil, err
+	}
+
+	return &controlplane.StatsResponse{Stats: stats}, nil
 }
 
 func (s *Service) Start(_ context.Context, req *controlplane.StartRequest) (*controlplane.StartResponse, error) {

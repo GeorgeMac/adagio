@@ -4,7 +4,14 @@ RUN apk update && apk add make git
 
 WORKDIR /workspace
 
-ADD . /workspace
+ADD go.mod go.mod
+ADD go.sum go.sum
+
+RUN go mod download
+
+ADD cmd/ cmd/
+ADD pkg/ pkg/
+ADD Makefile .
 
 RUN make build
 

@@ -8,6 +8,11 @@ import "pkg/adagio/adagio.proto";
 import "google/api/annotations.proto";
 
 service ControlPlane {
+  rpc Stats(StatsRequest) returns (StatsResponse) {
+    option(google.api.http) = {
+      get: "/v0/stats",
+    };
+  };
   rpc Start(StartRequest) returns (StartResponse) {
     option (google.api.http) = {
       put: "/v0/runs"
@@ -26,6 +31,12 @@ service ControlPlane {
       get: "/v0/runs/{id=*}"
     };
   };
+}
+
+message StatsRequest {}
+
+message StatsResponse {
+  adagio.Stats stats = 1;
 }
 
 message StartRequest {

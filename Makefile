@@ -17,11 +17,11 @@ test: ## Run test suite
 
 .PHONY: test-with-integrations
 test-with-integrations: ## Run test suite with integrations (i.e. etcd)
-	go test -cover -count 5 -race -tags etcd ./...
+	@hack/integration-test.sh
 
 .PHONY: deps
 deps: ## Fetch and vendor dependencies
-	go mod vendor
+	go mod download
 
 .PHONY: protobuf
 protobuf: protobuf-deps ## Build protocol buffers into model and grpc service definitions
