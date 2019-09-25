@@ -4,6 +4,7 @@
       <b-navbar>
         <template slot="brand">
           <b-navbar-item tag="router-link" :to="{ name: 'home' }">
+            <img src="./assets/images/logo.png" />
             <strong>ADAGIO</strong>
           </b-navbar-item>
         </template>

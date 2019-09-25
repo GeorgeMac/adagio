@@ -14,6 +14,7 @@
     "buefy": "^0.8.3",
     "core-js": "^2.6.5",
     "dagre-d3": "^0.6.3",
+    "favicons-webpack-plugin": "^1.0.2",
     "swagger-client": "^3.9.4",
     "vue": "^2.6.10",
     "vue-router": "^3.1.3",
