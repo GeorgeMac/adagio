@@ -29,6 +29,7 @@ type (
 )
 
 type Repository struct {
+	agents map[string]*adagio.Agent
 	runs   map[string]runState
 	claims map[string]struct {
 		run  *adagio.Run
@@ -43,7 +44,8 @@ type Repository struct {
 
 func New() *Repository {
 	return &Repository{
-		runs: map[string]runState{},
+		agents: map[string]*adagio.Agent{},
+		runs:   map[string]runState{},
 		claims: map[string]struct {
 			run  *adagio.Run
 			node *adagio.Node
@@ -138,6 +140,21 @@ func (r *Repository) InspectRun(id string) (*adagio.Run, error) {
 	}
 
 	return run, nil
+}
+
+func (r *Repository) ListAgents() (agents []*adagio.Agent, err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for _, agent := range r.agents {
+		agents = append(agents, agent)
+	}
+
+	sort.Slice(agents, func(i, j int) bool {
+		return agents[i].Id < agents[j].Id
+	})
+
+	return
 }
 
 func (r *Repository) ListRuns() (runs []*adagio.Run, err error) {
@@ -305,9 +322,11 @@ func (r *Repository) handleFailure(state runState, node *adagio.Node, src map[gr
 	return nil
 }
 
-func (r *Repository) Subscribe(events chan<- *adagio.Event, types ...adagio.Event_Type) error {
+func (r *Repository) Subscribe(agent *adagio.Agent, events chan<- *adagio.Event, types ...adagio.Event_Type) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	r.agents[agent.Id] = agent
 
 	for _, typ := range types {
 		r.listeners[typ] = append(r.listeners[typ], events)
@@ -316,9 +335,11 @@ func (r *Repository) Subscribe(events chan<- *adagio.Event, types ...adagio.Even
 	return nil
 }
 
-func (r *Repository) UnsubscribeAll(events chan<- *adagio.Event) error {
+func (r *Repository) UnsubscribeAll(agent *adagio.Agent, events chan<- *adagio.Event) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	delete(r.agents, agent.Id)
 
 	for event, chans := range r.listeners {
 		for i, ch := range chans {

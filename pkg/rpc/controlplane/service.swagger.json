@@ -15,14 +15,30 @@
     "application/json"
   ],
   "paths": {
-    "/v0/runs": {
+    "/v0/agents": {
       "get": {
-        "operationId": "List",
+        "operationId": "ListAgents",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/controlplaneListResponse"
+              "$ref": "#/definitions/controlplaneListAgentsResponse"
+            }
+          }
+        },
+        "tags": [
+          "ControlPlane"
+        ]
+      }
+    },
+    "/v0/runs": {
+      "get": {
+        "operationId": "ListRuns",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/controlplaneListRunsResponse"
             }
           }
         },
@@ -147,6 +163,20 @@
         "completed_count": {
           "type": "string",
           "format": "int64"
+        }
+      }
+    },
+    "adagioAgent": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "runtimes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/adagioRuntime"
+          }
         }
       }
     },
@@ -310,6 +340,14 @@
       ],
       "default": "WAITING"
     },
+    "adagioRuntime": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      }
+    },
     "adagioStats": {
       "type": "object",
       "properties": {
@@ -330,7 +368,18 @@
         }
       }
     },
-    "controlplaneListResponse": {
+    "controlplaneListAgentsResponse": {
+      "type": "object",
+      "properties": {
+        "agents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/adagioAgent"
+          }
+        }
+      }
+    },
+    "controlplaneListRunsResponse": {
       "type": "object",
       "properties": {
         "runs": {

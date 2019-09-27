@@ -63,6 +63,7 @@ func TestPool_HappyPath_NODE_READY(t *testing.T) {
 
 	// ensure each subscriber supplied a channel for ready events
 	for _, call := range repo.subscribeCalls {
+		require.NotNil(t, call.agent)
 		require.NotNil(t, call.events)
 
 		assert.Equal(t, []adagio.Event_Type{

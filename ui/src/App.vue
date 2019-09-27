@@ -4,7 +4,7 @@
       <b-navbar>
         <template slot="brand">
           <b-navbar-item tag="router-link" :to="{ name: 'home' }">
-            <img src="./assets/images/logo.png" />
+            <img src="./assets/images/logo.png" style="max-height: inherit;" width="64px" height="64px" />
             <strong>ADAGIO</strong>
           </b-navbar-item>
         </template>
@@ -12,7 +12,7 @@
           <b-navbar-item tag="router-link" :to="{ name: 'runs' }">
             Runs
           </b-navbar-item>
-          <b-navbar-item href="#">
+          <b-navbar-item tag="router-link" :to="{ name: 'agents' }">
             Agents
           </b-navbar-item>
 
@@ -57,5 +57,9 @@ export default {
   text-align: center;
   color: #2c3e50;
   margin-top: 60px;
+}
+
+#app > header {
+  margin-bottom: 3rem;
 }
 </style>

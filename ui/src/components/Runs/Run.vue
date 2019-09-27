@@ -1,5 +1,14 @@
 <template>
   <section class="section">
+    <section class="hero">
+      <div class="hero-body">
+        <div class="container">
+          <h1 class="title">
+            Run {{ run.id }}
+          </h1>
+        </div>
+      </div>
+    </section>
     <div class="container">
       <Graph v-bind:run="run" />
     </div>

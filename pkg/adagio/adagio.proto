@@ -97,6 +97,15 @@ message Result {
   bytes output = 3;
 }
 
+message Runtime {
+  string name = 1;
+}
+
+message Agent {
+  string id = 1;
+  repeated Runtime runtimes = 2;
+}
+
 message Claim {
   string id = 1;
   map<string, MetadataValue> metadata = 2;

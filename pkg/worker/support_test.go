@@ -81,11 +81,16 @@ func (r *repository) FinishNode(runID string, name string, result *adagio.Node_R
 }
 
 type subscribeCall struct {
+	agent  *adagio.Agent
 	events chan<- *adagio.Event
 	types  []adagio.Event_Type
 }
 
-func (r *repository) Subscribe(events chan<- *adagio.Event, types ...adagio.Event_Type) error {
+func (r *repository) UnsubscribeAll(*adagio.Agent, chan<- *adagio.Event) error {
+	panic("not implemented")
+}
+
+func (r *repository) Subscribe(agent *adagio.Agent, events chan<- *adagio.Event, types ...adagio.Event_Type) error {
 	r.mu.Lock()
 	defer func() {
 		r.subscriptionCount.Done()
@@ -93,7 +98,7 @@ func (r *repository) Subscribe(events chan<- *adagio.Event, types ...adagio.Even
 		r.mu.Unlock()
 	}()
 
-	r.subscribeCalls = append(r.subscribeCalls, subscribeCall{events, types})
+	r.subscribeCalls = append(r.subscribeCalls, subscribeCall{agent, events, types})
 
 	return nil
 }

@@ -1,6 +1,7 @@
 import Vue from "vue";
 import Router from "vue-router";
 import Home from "@/components/Home";
+import Agents from "@/components/Agents";
 import Runs from "@/components/Runs";
 import Run from "@/components/Runs/Run";
 import New from "@/components/Runs/New";
@@ -28,6 +29,11 @@ export default new Router({
       path: "/runs/:id",
       name: "run",
       component: Run 
+    },
+    {
+      path: "/agents",
+      name: "agents",
+      component: Agents
     }
   ]
 });

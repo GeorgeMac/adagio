@@ -79,11 +79,6 @@ type OrphanFunc func(*adagio.Claim)
 
 func (o OrphanFunc) Orphan(c *adagio.Claim) { o(c) }
 
-type UnsubscribeRepository interface {
-	Repository
-	UnsubscribeAll(chan<- *adagio.Event) error
-}
-
 type Constructor func(func() time.Time) (Repository, Orphaner)
 
 func TestHarness(t *testing.T, repoFn Constructor) {
@@ -608,11 +603,12 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 		require.NotNil(t, run)
 
 		var (
+			agent     = &adagio.Agent{Id: "foo"}
 			events    = make(chan *adagio.Event, 5)
 			collected = make([]*adagio.Event, 0)
 		)
 
-		err = repo.Subscribe(events, adagio.Event_NODE_READY, adagio.Event_NODE_ORPHANED)
+		err = repo.Subscribe(agent, events, adagio.Event_NODE_READY, adagio.Event_NODE_ORPHANED)
 		require.Nil(t, err)
 
 		assert.Equal(t, adagio.Run_WAITING, run.Status)
@@ -691,16 +687,15 @@ func (l *TestLayer) Exec(t *testing.T) {
 	t.Helper()
 
 	var (
+		agent     = &adagio.Agent{Id: "foo"}
 		events    = make(chan *adagio.Event, len(l.Events))
 		collected = make([]*adagio.Event, 0)
-		err       = l.Repository.Subscribe(events, adagio.Event_NODE_READY)
+		err       = l.Repository.Subscribe(agent, events, adagio.Event_NODE_READY)
 	)
 	require.Nil(t, err)
 
 	defer func() {
-		if urepo, ok := l.Repository.(UnsubscribeRepository); ok {
-			urepo.UnsubscribeAll(events)
-		}
+		l.Repository.UnsubscribeAll(agent, events)
 
 		close(events)
 	}()
@@ -740,6 +735,14 @@ func (l *TestLayer) Exec(t *testing.T) {
 			fmt.Println(pretty.Diff(l.Events, collected))
 		}
 	}
+
+	t.Run("the subscribed agent is listed", func(t *testing.T) {
+		agents, err := l.Repository.ListAgents()
+		require.Nil(t, err)
+		require.Len(t, agents, 1)
+
+		assert.Equal(t, agent, agents[0])
+	})
 }
 
 func canNotClaim(t *testing.T, repo Repository, run *adagio.Run, names ...string) {

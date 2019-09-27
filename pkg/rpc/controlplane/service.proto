@@ -13,6 +13,7 @@ service ControlPlane {
       get: "/v0/stats",
     };
   };
+
   rpc Start(StartRequest) returns (StartResponse) {
     option (google.api.http) = {
       put: "/v0/runs"
@@ -20,7 +21,7 @@ service ControlPlane {
     };
   };
 
-  rpc List(ListRequest) returns (ListResponse) {
+  rpc ListRuns(ListRequest) returns (ListRunsResponse) {
     option (google.api.http) = {
       get: "/v0/runs"
     };
@@ -29,6 +30,12 @@ service ControlPlane {
   rpc Inspect(InspectRequest) returns (InspectResponse) {
     option (google.api.http) = {
       get: "/v0/runs/{id=*}"
+    };
+  };
+
+  rpc ListAgents(ListRequest) returns (ListAgentsResponse) {
+    option (google.api.http) = {
+      get: "/v0/agents"
     };
   };
 }
@@ -57,6 +64,10 @@ message InspectResponse {
 
 message ListRequest {}
 
-message ListResponse {
+message ListRunsResponse {
   repeated Run runs = 1;
+}
+
+message ListAgentsResponse {
+  repeated Agent agents = 1;
 }

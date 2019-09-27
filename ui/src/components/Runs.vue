@@ -55,7 +55,7 @@ export default {
   methods: {
     getRuns() {
       Adagio.then((client) => {
-        client.apis.ControlPlane.List().then((resp) => {
+        client.apis.ControlPlane.ListRuns().then((resp) => {
           this.runs = resp.body.runs.reverse();
         })
       });

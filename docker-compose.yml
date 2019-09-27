@@ -1,4 +1,4 @@
-version: '2'
+version: '2.2'
 services:
   api:
     build:
@@ -10,7 +10,7 @@ services:
       - -etcd-addresses=http://etcd:2379
       - api
     restart: always
-  agent_one:
+  agent:
     build:
       context: .
       dockerfile: docker/Dockerfile
@@ -20,16 +20,7 @@ services:
       - -etcd-addresses=http://etcd:2379
       - agent
     restart: always
-  agent_two:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-    command:
-      - adagiod
-      - -backend-type=etcd
-      - -etcd-addresses=http://etcd:2379
-      - agent
-    restart: always
+    scale: 3
   gateway:
     build:
       context: .
@@ -39,6 +30,8 @@ services:
       - -adagiod-addr=api:7890
     volumes:
       - "./ui/:/ui/"
+    ports:
+      - "7891:7891"
     depends_on:
       - api
   ui:
