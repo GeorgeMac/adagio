@@ -1,14 +1,5 @@
 <template>
   <div id="run">
-    <section class="hero">
-      <div class="hero-body">
-        <div class="container">
-          <h1 class="title">
-            Run {{ run.id }}
-          </h1>
-        </div>
-      </div>
-    </section>
     <div :id="run.id" class="container">
     </div>
   </div>

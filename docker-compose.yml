@@ -30,6 +30,8 @@ services:
       - -adagiod-addr=api:7890
     volumes:
       - "./ui/:/ui/"
+    ports:
+      - "7891:7891"
     depends_on:
       - api
   ui:
