@@ -14,6 +14,12 @@ Adagio focusses primarily on orchestration of workflow execution. The execution 
 
 # Usage
 
+## test drive
+
+`docker-compse up`
+
+Navigate to `localhost:8080`.
+
 ## adagio - cli
 
 The adagio cli tool communicates with the control plane API. A running adagiod control plane API must be reachable.
@@ -31,7 +37,7 @@ adagio runs start <stdin>
 
 ## adagiod - service
 
-This daemon service consists of the adagio control plan API and the worker process. More documentation can be found [here](./cmd/adagiod).
+This daemon service consists of the adagio control plane API and the worker process. More documentation can be found [here](./cmd/adagiod).
 
 # Building
 
