@@ -16,7 +16,7 @@ Adagio focusses primarily on orchestration of workflow execution. The execution 
 
 ## test drive
 
-`docker-compse up`
+`docker-compose up`
 
 Navigate to `localhost:8080`.
 
