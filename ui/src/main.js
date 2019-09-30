@@ -7,10 +7,10 @@ import router from './router';
 
 import { library } from '@fortawesome/fontawesome-svg-core';
 // internal icons
-import { faCheck, faPlus, faArrowUp } from "@fortawesome/free-solid-svg-icons";
+import { faCheck, faPlus, faArrowUp, faSpinner } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 
-library.add(faCheck, faPlus, faArrowUp);
+library.add(faCheck, faPlus, faArrowUp, faSpinner);
 Vue.component('vue-fontawesome', FontAwesomeIcon);
 
 Vue.config.productionTip = false
