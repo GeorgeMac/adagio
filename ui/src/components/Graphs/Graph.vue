@@ -33,8 +33,7 @@ export default {
       .setGraph({rankdir: 'LR'})
       .setDefaultEdgeLabel(function() { return {}; });
 
-      var lookup = {};
-      this.run.nodes.forEach((node, index) => {
+      this.run.nodes.forEach((node) => {
         var cls = "node-default";
         if (node.status == "RUNNING") {
           cls = "node-running";
@@ -52,21 +51,23 @@ export default {
           case "ERROR":
               cls = "node-error";
               break;
-          }  
+          }
         }
 
         var label = `"${node.spec.name}" runtime: "${node.spec.runtime}"`;
 
-        var n = g.setNode(index, { label: label, class: cls });
+        var n = g.setNode(node.spec.name, {
+          label: label,
+          class: cls,
+          id: `node-${node.spec.name}`
+        });
+
         n.rx = n.ry = 5;
-        lookup[node.spec.name] = index;
       });
 
       if (this.run.edges !== undefined) {
         this.run.edges.forEach((edge) => {
-          var src = lookup[edge.source];
-          var dst = lookup[edge.destination];
-          g.setEdge(src, dst);
+          g.setEdge(edge.source, edge.destination);
         });
       }
 
@@ -81,6 +82,22 @@ export default {
       // Run the renderer. This is what draws the final graph.
       render(svgGroup, g);
 
+      // Register handlers
+      var parent = this;
+      svgGroup.selectAll("g.node").on("click", function() {
+        var node = d3.select(this);
+        var cls = node.attr("class");
+        if (cls.includes("selected")) {
+          cls = cls.replace(" selected", "");
+        } else {
+          cls += " selected";
+        }
+
+        node.attr("class", cls);
+
+        parent.$emit('clicked', node.attr('id').slice(5));
+      });
+
       // Center the graph
       svg.attr("width", g.graph().width + 100);
       var xCenterOffset = (svg.attr("width") - g.graph().width) / 2;
@@ -93,7 +110,6 @@ export default {
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style>
-  /* This sets the color for "TK" nodes to a light blue green. */
   g.node-success > rect {
     fill: hsl(141, 71%, 48%);
   }
@@ -120,6 +136,20 @@ export default {
     stroke: #999;
     fill: #fff;
     stroke-width: 1.5px;
+  }
+
+  #editGraph .node rect:hover {
+    stroke: hsl(48, 100%, 67%);
+    cursor: pointer;
+  }
+
+  #editGraph .node .label tspan {
+    pointer-events: none;
+  }
+
+  #editGraph .node.selected rect {
+    stroke: hsl(48, 100%, 67%);
+    stroke-width: 3px;
   }
 
   .edgePath path {

@@ -22,7 +22,8 @@ func main() {
 		fmt.Println()
 		fmt.Print("Usage: adagio <COMMAND> [OPTIONS]\n\n")
 		fmt.Println("Commands:")
-		fmt.Println("\truns - manage adagio runs")
+		fmt.Println("\truns  - manage adagio runs")
+		fmt.Println("\tstats - view adagio statistics")
 		fmt.Println("Options:")
 		fs.PrintDefaults()
 	}
