@@ -1,6 +1,6 @@
 <template>
-  <div id="run">
-    <div :id="run.id" class="container">
+  <div class="container">
+    <div :id="id" class="container">
     </div>
   </div>
 </template>
@@ -13,6 +13,17 @@ export default {
   name: 'Graph',
   props: {
     run: Object
+  },
+  computed: {
+    id() {
+      return `run-${this.run.id}`;
+    }
+  },
+  data() {
+    return {
+      selectedNode: null,
+      lookup: {}
+    }
   },
   mounted() {
     this.generateGraph();
@@ -32,9 +43,11 @@ export default {
       var g = new dagreD3.graphlib.Graph()
       .setGraph({rankdir: 'LR'})
       .setDefaultEdgeLabel(function() { return {}; });
+      this.lookup = {};
 
-      var lookup = {};
-      this.run.nodes.forEach((node, index) => {
+      this.run.nodes.forEach((node) => {
+        this.lookup[node.spec.name] = node;
+
         var cls = "node-default";
         if (node.status == "RUNNING") {
           cls = "node-running";
@@ -52,34 +65,54 @@ export default {
           case "ERROR":
               cls = "node-error";
               break;
-          }  
+          }
         }
 
-        var label = `"${node.spec.name}" runtime: "${node.spec.runtime}"`;
+        var n = g.setNode(node.spec.name, {
+          id: `node-${node.spec.name}`,
+          label: node.spec.name,
+          class: cls
+        });
 
-        var n = g.setNode(index, { label: label, class: cls });
         n.rx = n.ry = 5;
-        lookup[node.spec.name] = index;
       });
 
       if (this.run.edges !== undefined) {
         this.run.edges.forEach((edge) => {
-          var src = lookup[edge.source];
-          var dst = lookup[edge.destination];
-          g.setEdge(src, dst);
+          g.setEdge(edge.source, edge.destination);
         });
       }
 
       // Create the renderer
       var render = new dagreD3.render();
 
-      var container = document.getElementById(this.run.id);
+      // build the svg
+      var container = document.getElementById(this.id);
       var svg = d3.select(container).append("svg");
       svg.attr("id", "graph");
       var svgGroup = svg.append("g");
 
       // Run the renderer. This is what draws the final graph.
       render(svgGroup, g);
+
+      // Register handlers
+      var parent = this;
+      svgGroup.selectAll("g.node").on("click", function() {
+        var n = d3.select(this);
+
+        d3.selectAll("g.node.selected").classed("selected", false);
+
+        // toggle selected class
+        var cls = n.attr("class");
+        n.attr("class", cls + " selected");
+
+        // strip `node-` prefix off id to get node name
+        var name = n.attr('id').slice(5);
+        // set current selected node on graph
+        parent.selectedNode = parent.lookup[name];
+        // tell parent the node was clicked
+        parent.$emit('clicked', parent.selectedNode);
+      });
 
       // Center the graph
       svg.attr("width", g.graph().width + 100);
@@ -93,7 +126,6 @@ export default {
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style>
-  /* This sets the color for "TK" nodes to a light blue green. */
   g.node-success > rect {
     fill: hsl(141, 71%, 48%);
   }
@@ -120,6 +152,20 @@ export default {
     stroke: #999;
     fill: #fff;
     stroke-width: 1.5px;
+    cursor: pointer;
+  }
+
+  .node .label tspan {
+    pointer-events: none;
+  }
+
+  .node rect:hover {
+    stroke: hsl(48, 100%, 67%);
+  }
+
+  .node.selected rect {
+    stroke: hsl(48, 100%, 67%);
+    stroke-width: 3px;
   }
 
   .edgePath path {

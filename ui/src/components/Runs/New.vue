@@ -1,57 +1,25 @@
 <template>
-  <section class="columns">
-    <div class="column">
+  <section class="columns is-centered">
+    <div class="column is-8">
       <b-tabs v-model="tab" type="is-boxed">
         <b-tab-item label="Editor" id="editor">
-          <div class="card">
-            <div class="card-content">
-              <!-- nodes -->
-              <b-field label="Name" horizontal>
-                <b-input placeholder="Give it a name" v-model="currentNode.name"></b-input>
-              </b-field>
-              <b-field label="Runtime" horizontal>
-                <b-select placeholder="Select a runtime" v-model="currentNode.runtime">
-                  <option v-for="runtime in runtimes" :value="runtime" :key="runtime">
-                  {{ runtime }}
-                  </option>
-                </b-select>
-              </b-field>
-            </div>
-            <div class="card-footer">
-              <a
-                class="is-primary card-footer-item"
-                @click.prevent="createNode()"
-                >
+          <!-- nodes -->
+          <b-field label="Node" label-position="on-border">
+            <b-input placeholder="Give it a name" v-model="currentNode.name"></b-input>
+            <b-select placeholder="Select a runtime" v-model="currentNode.runtime">
+              <option v-for="runtime in runtimes" :value="runtime" :key="runtime">
+              {{ runtime }}
+              </option>
+            </b-select>
+            <p class="control">
+              <b-button class="button is-primary" @click.prevent="createNode()">
                 Add Node
-              </a>
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-content">
-              <!-- edges -->
-              <b-field label="Source" horizontal>
-                <b-select placeholder="Select a node" v-model="currentEdge.source">
-                  <option v-for="node in spec.nodes" :value="node.name" :key="node.name">
-                  {{ node.name }}
-                  </option>
-                </b-select>
-              </b-field>
-              <b-field label="Destination" horizontal>
-                <b-select placeholder="Select an edge" v-model="currentEdge.destination">
-                  <option v-for="node in spec.nodes" :value="node.name" :key="node.name">
-                  {{ node.name }}
-                  </option>
-                </b-select>
-              </b-field>
-            </div>
-            <footer class="card-footer">
-              <a
-                class="is-primary card-footer-item"
-                @click.prevent="createEdge()"
-                >
-                Add Edge
-              </a>
-            </footer>
+              </b-button>
+            </p>
+          </b-field>
+          <!-- graph demo container -->
+          <div class="container" id="editGraph">
+            <Graph v-bind:run="specToRun()" @clicked="onNodeClicked" />
           </div>
         </b-tab-item>
         <b-tab-item label="Raw" id="raw">
@@ -66,13 +34,8 @@
         class="button is-primary"
         @click.prevent="createRun()"
         >
-        Create
+        Create Run
       </button>
-    </div>
-    <div class="column" id="graphEditorColumn">
-      <div class="container" id="editGraph">
-        <Graph v-bind:run="specToRun()" />
-      </div>
     </div>
   </section>
 </template>
@@ -90,6 +53,7 @@ export default {
     return {
       tab: 0,
       runtimes: [],
+      selectedNode: null,
       currentNode: {
         name:    "",
         runtime: null
@@ -154,6 +118,23 @@ export default {
         edges: this.spec.edges
       }
     },
+    onNodeClicked(n) {
+      if (this.selectedNode === null) {
+        this.selectedNode = n.spec.name;
+        return
+      }
+
+      if (this.selectedNode === n.spec.name) {
+        return
+      }
+
+      this.spec.edges.push({
+        source:      this.selectedNode,
+        destination: n.spec.name,
+      });
+
+      this.selectedNode = null;
+    },
     specPayload() {
       if (this.editorInFocus()) {
         return this.spec;
@@ -171,7 +152,17 @@ export default {
     createRun() {
       Adagio.then((client) => {
         client.apis.ControlPlane.Start(this.createPayload()).then((resp) => {
-          this.$router.push('/runs/' + resp.body.run.id)
+          this.$buefy.snackbar.open({
+              duration: 5000,
+              message: 'run started',
+              type: 'is-success',
+              position: 'is-top',
+              actionText: 'View',
+              queue: false,
+              onAction: () => {
+                this.$router.push('/runs/' + resp.body.run.id);
+              }
+          })
         })
       });
     },
@@ -198,11 +189,12 @@ export default {
 </script>
 
 <style scoped>
-div#graphEditorColumn {
-  padding-top: 20%;
-}
-
 div.card {
   margin-bottom: 1rem;
+}
+
+#editGraph {
+  min-height: 5rem;
+  border: 1px dashed;
 }
 </style>

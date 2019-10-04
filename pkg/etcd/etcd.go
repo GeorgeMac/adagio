@@ -530,6 +530,8 @@ func (r *Repository) Subscribe(agent *adagio.Agent, events chan<- *adagio.Event,
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	// create agent record
+
 	// construct a lease for the agent
 	leaseID, err := r.lease(agent.Id)
 	if err != nil {
@@ -546,6 +548,8 @@ func (r *Repository) Subscribe(agent *adagio.Agent, events chan<- *adagio.Event,
 		return err
 	}
 
+	// begin subscription
+
 	ch := make(chan struct{})
 
 	r.subscriptions[events] = ch
@@ -553,7 +557,34 @@ func (r *Repository) Subscribe(agent *adagio.Agent, events chan<- *adagio.Event,
 	go func() {
 		defer r.cancelLease(agent.Id)
 
-		watch := r.watcher.Watch(context.Background(), r.ns.states(), clientv3.WithPrefix())
+		var (
+			ctxt   = context.Background()
+			opts   = []clientv3.OpOption{clientv3.WithPrefix()}
+			filter = filter{
+				orphaned: !types(typ).contains(adagio.Event_NODE_ORPHANED),
+				ready:    !types(typ).contains(adagio.Event_NODE_READY),
+			}
+		)
+
+		// consume existing ready nodes
+		resp, err := r.kv.Get(ctxt, r.ns.nodesInStateKey(adagio.Node_READY), clientv3.WithPrefix())
+		if err != nil {
+			log.Println(err)
+			goto Watch
+		}
+
+		// handle ready node events
+		for _, kv := range resp.Kvs {
+			r.handleKeyEvent(ctxt, events, keyEvent{kv.Key, keyCreated}, filter, clientv3.WithRev(resp.Header.Revision))
+		}
+
+		// set the watch responses to return a revision higher than the response
+		// to reduce the chance we observe the same ready node twice
+		opts = append(opts, clientv3.WithRev(resp.Header.Revision+1))
+
+	Watch:
+		// watch for new events
+		watch := r.watcher.Watch(ctxt, r.ns.states(), opts...)
 		for {
 			var resp clientv3.WatchResponse
 			select {
@@ -568,61 +599,23 @@ func (r *Repository) Subscribe(agent *adagio.Agent, events chan<- *adagio.Event,
 			}
 
 			for _, ev := range resp.Events {
-				keyParts := strings.Split(r.ns.stripBytes(ev.Kv.Key), "/")
-				if len(keyParts) < 6 || keyParts[0] != "states" {
-					// we're only interested in keys that represent states
-					continue
+				kev := keyEvent{
+					Key: ev.Kv.Key,
 				}
 
-				status := stringToStatus(keyParts[1])
-				switch status {
-				// we're only interested in actions on ready and running keys
-				case adagio.Node_READY, adagio.Node_RUNNING:
-				default:
-					continue
-				}
-
-				run, err := r.getRun(context.Background(), keyParts[3], clientv3.WithRev(resp.Header.Revision))
-				if err != nil {
-					log.Println(keyParts[3], err)
-					continue
-				}
-
-				node, err := run.GetNodeByName(keyParts[5])
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-
-				// if a ready status key has been created and the subscription contains a
-				// node ready type then send a node ready event
-				if ev.IsCreate() && status == adagio.Node_READY && types(typ).contains(adagio.Event_NODE_READY) {
-					events <- &adagio.Event{
-						Type:     adagio.Event_NODE_READY,
-						RunID:    keyParts[3],
-						NodeSpec: node.Spec,
-					}
-
-					continue
+				if ev.IsCreate() {
+					kev.Type = keyCreated
 				}
 
 				// todo(george): import issues with etcd returning old urls from types
 				// defined in new url scheme makes importing other etcd v3 libs to break
 				// until then I am just going to compare to the literal 1 value which means
 				// DELETE operation
-				// given the deletion of a running key where no other state key for the
-				// node exists (this is where GetNodeByName returns a node with a NONE status)
-				if ev.Type == 1 && status == adagio.Node_RUNNING && node.Status == adagio.Node_NONE {
-					// only send if the subscription contains the node orphaned
-					// event type
-					if types(typ).contains(adagio.Event_NODE_ORPHANED) {
-						events <- &adagio.Event{
-							Type:     adagio.Event_NODE_ORPHANED,
-							RunID:    keyParts[3],
-							NodeSpec: node.Spec,
-						}
-					}
+				if ev.Type == 1 {
+					kev.Type = keyDeleted
 				}
+
+				r.handleKeyEvent(ctxt, events, kev, filter, clientv3.WithRev(resp.Header.Revision))
 			}
 		}
 	}()
@@ -630,10 +623,78 @@ func (r *Repository) Subscribe(agent *adagio.Agent, events chan<- *adagio.Event,
 	return nil
 }
 
-func (r *Repository) getRun(ctxt context.Context, id string, ops ...clientv3.OpOption) (*adagio.Run, error) {
-	run := &adagio.Run{
-		Id: id,
+type keyEvent struct {
+	Key  []byte
+	Type keyEventType
+}
+
+type keyEventType int
+
+const (
+	keyUnknown keyEventType = iota
+	keyCreated
+	keyDeleted
+)
+
+type filter struct {
+	orphaned bool
+	ready    bool
+}
+
+func (r *Repository) handleKeyEvent(ctxt context.Context, dest chan<- *adagio.Event, ev keyEvent, filter filter, opts ...clientv3.OpOption) {
+	keyParts := strings.Split(r.ns.stripBytes(ev.Key), "/")
+	if len(keyParts) < 6 {
+		return
 	}
+
+	status := stringToStatus(keyParts[1])
+	switch status {
+	// we're only interested in actions on ready and running keys
+	case adagio.Node_READY, adagio.Node_RUNNING:
+	default:
+		return
+	}
+
+	run, err := r.getRun(context.Background(), keyParts[3], opts...)
+	if err != nil {
+		log.Println(keyParts[3], err)
+		return
+	}
+
+	node, err := run.GetNodeByName(keyParts[5])
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	switch ev.Type {
+	case keyCreated:
+		// if a ready status key has been created and the subscription contains a
+		// node ready type then send a node ready event
+		if status == adagio.Node_READY && !filter.ready {
+			dest <- &adagio.Event{
+				Type:     adagio.Event_NODE_READY,
+				RunID:    keyParts[3],
+				NodeSpec: node.Spec,
+			}
+		}
+	case keyDeleted:
+		// given the deletion of a running key where no other state key for the
+		// node exists (this is where GetNodeByName returns a node with a NONE status)
+		if status == adagio.Node_RUNNING && node.Status == adagio.Node_NONE && !filter.orphaned {
+			dest <- &adagio.Event{
+				Type:     adagio.Event_NODE_ORPHANED,
+				RunID:    keyParts[3],
+				NodeSpec: node.Spec,
+			}
+		}
+	}
+
+	return
+}
+
+func (r *Repository) getRun(ctxt context.Context, id string, ops ...clientv3.OpOption) (*adagio.Run, error) {
+	run := &adagio.Run{Id: id}
 
 	resp, err := r.kv.Get(ctxt, r.ns.runKey(run), ops...)
 	if err != nil {
