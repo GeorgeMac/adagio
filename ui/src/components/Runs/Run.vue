@@ -3,18 +3,22 @@
     <div class="columns is-centered">
       <div class="column">
         <figure class="image">
-          <Graph v-bind:run="run" />
+          <Graph v-bind:run="run" @clicked="onNodeClicked"/>
         </figure>
       </div>
       <div class="column has-text-left">
-        <p class="title">run details</p>
-        <p class="subtitle">{{ run.id }}</p>
         <div class="content">
-          <span :class="status.class">
-            {{ run.status.toLowerCase() }}
-            <b-icon pack="fas" :icon="status.icon" :custom-class="status.custom"></b-icon>
-          </span>
+          <p class="title">run details</p>
+          <p class="subtitle">{{ run.id }}</p>
+          <div class="content">
+            <span :class="status.class">
+              {{ run.status.toLowerCase() }}
+              <b-icon pack="fas" :icon="status.icon" :custom-class="status.custom"></b-icon>
+            </span>
+          </div>
         </div>
+        <hr />
+        <Node :node="selectedNode" />
       </div>
     </div>
   </section>
@@ -23,11 +27,13 @@
 <script>
 import { Adagio } from '@/services/adagio';
 import Graph from '../Graphs/Graph';
+import Node from '../Nodes/Node';
 
 export default {
   name: 'Runs',
   components: {
-    Graph
+    Graph,
+    Node
   },
   computed: {
     id() {
@@ -66,7 +72,8 @@ export default {
         status: 'WAITING',
         nodes: [],
         edges: []
-      }
+      },
+      selectedNode: null
     }
   },
   mounted() {
@@ -88,6 +95,9 @@ export default {
           this.run = resp.body.run;
         })
       });
+    },
+    onNodeClicked(n) {
+      this.selectedNode = n;
     }
   }
 }

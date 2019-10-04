@@ -1,6 +1,6 @@
 <template>
-  <div id="run">
-    <div :id="run.id" class="container">
+  <div class="container">
+    <div :id="id" class="container">
     </div>
   </div>
 </template>
@@ -13,6 +13,17 @@ export default {
   name: 'Graph',
   props: {
     run: Object
+  },
+  computed: {
+    id() {
+      return `run-${this.run.id}`;
+    }
+  },
+  data() {
+    return {
+      selectedNode: null,
+      lookup: {}
+    }
   },
   mounted() {
     this.generateGraph();
@@ -32,8 +43,11 @@ export default {
       var g = new dagreD3.graphlib.Graph()
       .setGraph({rankdir: 'LR'})
       .setDefaultEdgeLabel(function() { return {}; });
+      this.lookup = {};
 
       this.run.nodes.forEach((node) => {
+        this.lookup[node.spec.name] = node;
+
         var cls = "node-default";
         if (node.status == "RUNNING") {
           cls = "node-running";
@@ -54,12 +68,10 @@ export default {
           }
         }
 
-        var label = `"${node.spec.name}" runtime: "${node.spec.runtime}"`;
-
         var n = g.setNode(node.spec.name, {
-          label: label,
-          class: cls,
-          id: `node-${node.spec.name}`
+          id: `node-${node.spec.name}`,
+          label: node.spec.name,
+          class: cls
         });
 
         n.rx = n.ry = 5;
@@ -74,7 +86,8 @@ export default {
       // Create the renderer
       var render = new dagreD3.render();
 
-      var container = document.getElementById(this.run.id);
+      // build the svg
+      var container = document.getElementById(this.id);
       var svg = d3.select(container).append("svg");
       svg.attr("id", "graph");
       var svgGroup = svg.append("g");
@@ -85,17 +98,20 @@ export default {
       // Register handlers
       var parent = this;
       svgGroup.selectAll("g.node").on("click", function() {
-        var node = d3.select(this);
-        var cls = node.attr("class");
-        if (cls.includes("selected")) {
-          cls = cls.replace(" selected", "");
-        } else {
-          cls += " selected";
-        }
+        var n = d3.select(this);
 
-        node.attr("class", cls);
+        d3.selectAll("g.node.selected").classed("selected", false);
 
-        parent.$emit('clicked', node.attr('id').slice(5));
+        // toggle selected class
+        var cls = n.attr("class");
+        n.attr("class", cls + " selected");
+
+        // strip `node-` prefix off id to get node name
+        var name = n.attr('id').slice(5);
+        // set current selected node on graph
+        parent.selectedNode = parent.lookup[name];
+        // tell parent the node was clicked
+        parent.$emit('clicked', parent.selectedNode);
       });
 
       // Center the graph
@@ -136,18 +152,18 @@ export default {
     stroke: #999;
     fill: #fff;
     stroke-width: 1.5px;
-  }
-
-  #editGraph .node rect:hover {
-    stroke: hsl(48, 100%, 67%);
     cursor: pointer;
   }
 
-  #editGraph .node .label tspan {
+  .node .label tspan {
     pointer-events: none;
   }
 
-  #editGraph .node.selected rect {
+  .node rect:hover {
+    stroke: hsl(48, 100%, 67%);
+  }
+
+  .node.selected rect {
     stroke: hsl(48, 100%, 67%);
     stroke-width: 3px;
   }

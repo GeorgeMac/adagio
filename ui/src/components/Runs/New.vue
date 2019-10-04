@@ -120,17 +120,17 @@ export default {
     },
     onNodeClicked(n) {
       if (this.selectedNode === null) {
-        this.selectedNode = n;
+        this.selectedNode = n.spec.name;
         return
       }
 
-      if (this.selectedNode === n) {
+      if (this.selectedNode === n.spec.name) {
         return
       }
 
       this.spec.edges.push({
         source:      this.selectedNode,
-        destination: n,
+        destination: n.spec.name,
       });
 
       this.selectedNode = null;
