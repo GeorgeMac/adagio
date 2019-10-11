@@ -37,9 +37,10 @@ export default {
         return
       }
 
+      // remove existing graph
       d3.select("div.container svg#graph").remove();
 
-      // Create the input graph
+      // create the input graph
       var g = new dagreD3.graphlib.Graph()
       .setGraph({rankdir: 'LR'})
       .setDefaultEdgeLabel(function() { return {}; });

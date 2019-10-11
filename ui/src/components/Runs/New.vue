@@ -1,25 +1,44 @@
 <template>
   <section class="columns is-centered">
-    <div class="column is-8">
+    <div class="column">
       <b-tabs v-model="tab" type="is-boxed">
         <b-tab-item label="Editor" id="editor">
-          <!-- nodes -->
-          <b-field label="Node" label-position="on-border">
-            <b-input placeholder="Give it a name" v-model="currentNode.name"></b-input>
-            <b-select placeholder="Select a runtime" v-model="currentNode.runtime">
-              <option v-for="runtime in runtimes" :value="runtime" :key="runtime">
-              {{ runtime }}
-              </option>
-            </b-select>
-            <p class="control">
-              <b-button class="button is-primary" @click.prevent="createNode()">
-                Add Node
-              </b-button>
-            </p>
-          </b-field>
-          <!-- graph demo container -->
-          <div class="container" id="editGraph">
-            <Graph v-bind:run="specToRun()" @clicked="onNodeClicked" />
+          <div class="columns">
+            <!-- graph preview -->
+            <div class="column">
+              <div class="container" id="editGraph">
+                <Graph v-bind:run="specToRun()" @clicked="onNodeClicked" />
+              </div>
+            </div>
+            <!-- node form -->
+            <div class="column">
+              <b-field label="Node" label-position="on-border">
+                <b-input placeholder="Give it a name" v-model="currentNode.name"></b-input>
+              </b-field>
+              <b-field label="Runtime" label-position="on-border">
+                <b-select placeholder="Select a runtime" v-model="currentNode.runtime" expanded>
+                  <option v-for="runtime in runtimes" :value="runtime" :key="runtime">
+                  {{ runtime }}
+                  </option>
+                </b-select>
+              </b-field>
+              <b-table :data="retries()" :columns="retryColumns" />
+                <b-field label="new retry" label-position="on-border">
+                  <b-select placeholder="retry condition" v-model="currentRetry.condition" expanded>
+                    <option value="error">error</option>
+                    <option value="fail">fail</option>
+                  </b-select>
+                  <b-input placeholder="maximum attempts" v-model="currentRetry.maxAttempts"></b-input>
+                  <p class="control">
+                  <b-button class="button" @click.prevent="createRetry()" >
+                    <b-icon icon="plus" />
+                  </b-button>
+                  </p>
+                </b-field>
+                <b-button class="button is-primary" @click.prevent="createNode()">
+                  Add Node
+                </b-button>
+            </div>
           </div>
         </b-tab-item>
         <b-tab-item label="Raw" id="raw">
@@ -56,12 +75,28 @@ export default {
       selectedNode: null,
       currentNode: {
         name:    "",
-        runtime: null
+        runtime: null,
+        retry: {}
       },
       currentEdge: {
         source:      null,
         destination: null
       },
+      currentRetry: {
+        condition: "",
+        maxAttempts: 0
+      },
+      retryColumns: [
+        {
+          field: 'condition',
+          label: 'Condition'
+        },
+        {
+          field: 'maximum_attempts',
+          label: 'Maximum Attempts',
+          numeric: true
+        }
+      ],
       spec: {
         nodes: [],
         edges: []
@@ -93,11 +128,17 @@ export default {
     nodes() {
       return this.spec.nodes.map((n) => { n.name })
     },
+    retries() {
+      return Object.entries(this.currentNode.retry).map(([k, v]) => {
+        return {'condition': k, 'maximum_attempts': v.max_attempts }
+      })
+    },
     createNode() {
       this.spec.nodes.push(this.currentNode);
       this.currentNode = {
         name:    "",
-        runtime: ""
+        runtime: null,
+        retry: {}
       };
     },
     createEdge() {
@@ -106,6 +147,15 @@ export default {
         source:      "",
         destination: ""
       };
+    },
+    createRetry() {
+      this.currentNode.retry[this.currentRetry.condition] = {
+        max_attempts: this.currentRetry.maxAttempts
+      };
+      this.currentRetry = {
+        condition: "",
+        maxAttempts: 0
+      }
     },
     specToRun() {
       return {
@@ -153,15 +203,15 @@ export default {
       Adagio.then((client) => {
         client.apis.ControlPlane.Start(this.createPayload()).then((resp) => {
           this.$buefy.snackbar.open({
-              duration: 5000,
-              message: 'run started',
-              type: 'is-success',
-              position: 'is-top',
-              actionText: 'View',
-              queue: false,
-              onAction: () => {
-                this.$router.push('/runs/' + resp.body.run.id);
-              }
+            duration: 5000,
+            message: 'run started',
+            type: 'is-success',
+            position: 'is-top',
+            actionText: 'View',
+            queue: false,
+            onAction: () => {
+              this.$router.push('/runs/' + resp.body.run.id);
+            }
           })
         })
       });
