@@ -309,25 +309,32 @@ func (r *Repository) transition(ctxt context.Context, runID string, node *adagio
 			), nil
 	}
 
-	// the following code handles orphaned nodes where
-	// the node is now not in any state
-	statusDoesNotExist := func(status adagio.Node_Status) clientv3.Cmp {
-		statusKey := r.ns.nodeInStateKey(runID, statusToString(status), node.Spec.Name)
-		return clientv3.Compare(clientv3.Version(statusKey), "=", 0)
-	}
-
 	return append(cmps,
-			// ensure node exists
-			clientv3.Compare(clientv3.Version(nodeKey), ">", 0),
-			// ensure node does not exist in any state
-			statusDoesNotExist(adagio.Node_WAITING),
-			statusDoesNotExist(adagio.Node_READY),
-			statusDoesNotExist(adagio.Node_RUNNING),
-			statusDoesNotExist(adagio.Node_COMPLETED)),
+			append(
+				// ensure node does not exist in any state
+				r.nodeIsOrphaned(runID, node),
+				// ensure node exists
+				clientv3.Compare(clientv3.Version(nodeKey), ">", 0),
+			)...),
 		append(ops,
 			clientv3.OpPut(nodeKey, string(data)),
 			clientv3.OpPut(toKey, "", putOpts...),
 		), nil
+}
+
+func (r *Repository) nodeIsOrphaned(runID string, node *adagio.Node) []clientv3.Cmp {
+	return []clientv3.Cmp{
+		// ensure node does not exist in any state
+		r.statusDoesNotExist(runID, node, adagio.Node_WAITING),
+		r.statusDoesNotExist(runID, node, adagio.Node_READY),
+		r.statusDoesNotExist(runID, node, adagio.Node_RUNNING),
+		r.statusDoesNotExist(runID, node, adagio.Node_COMPLETED),
+	}
+}
+
+func (r *Repository) statusDoesNotExist(runID string, node *adagio.Node, status adagio.Node_Status) clientv3.Cmp {
+	statusKey := r.ns.nodeInStateKey(runID, statusToString(status), node.Spec.Name)
+	return clientv3.Compare(clientv3.Version(statusKey), "=", 0)
 }
 
 func (r *Repository) lease(claimID string) (clientv3.LeaseID, error) {
@@ -455,7 +462,6 @@ func (r *Repository) handleSuccess(ctxt context.Context, run *adagio.Run, node *
 		out := o.(*adagio.Node)
 
 		if out.Status > adagio.Node_WAITING {
-			// outgoing node has already progressed from waiting state
 			continue
 		}
 
@@ -474,9 +480,16 @@ func (r *Repository) handleSuccess(ctxt context.Context, run *adagio.Run, node *
 			isReady = isReady && in.Status == adagio.Node_COMPLETED
 
 			if in == node {
+				// we have already considered the finishing node
 				continue
 			}
 
+			if in.Status == adagio.Node_NONE {
+				cmps = append(cmps, r.nodeIsOrphaned(run.Id, in)...)
+				continue
+			}
+
+			// ensure node in state key is created
 			currentKey := r.ns.nodeInStateKey(run.Id, statusToString(in.Status), in.Spec.Name)
 			cmps = append(cmps, clientv3.Compare(clientv3.Version(currentKey), ">", 0))
 		}

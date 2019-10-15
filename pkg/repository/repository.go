@@ -117,6 +117,10 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"b": adagio.Node_Result_SUCCESS,
 				},
 				Events: []*adagio.Event{
+					// on start
+					{RunID: run.Id, NodeSpec: a, Type: adagio.Event_NODE_READY},
+					{RunID: run.Id, NodeSpec: b, Type: adagio.Event_NODE_READY},
+					// after finish a and b
 					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_NODE_READY},
 					{RunID: run.Id, NodeSpec: d, Type: adagio.Event_NODE_READY},
 					{RunID: run.Id, NodeSpec: f, Type: adagio.Event_NODE_READY},
@@ -153,7 +157,10 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"f": adagio.Node_Result_SUCCESS,
 				},
 				Events: []*adagio.Event{
+					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_NODE_READY},
+					{RunID: run.Id, NodeSpec: d, Type: adagio.Event_NODE_READY},
 					{RunID: run.Id, NodeSpec: e, Type: adagio.Event_NODE_READY},
+					{RunID: run.Id, NodeSpec: f, Type: adagio.Event_NODE_READY},
 				},
 				RunStatus: adagio.Run_RUNNING,
 			},
@@ -179,6 +186,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"e": adagio.Node_Result_SUCCESS,
 				},
 				Events: []*adagio.Event{
+					{RunID: run.Id, NodeSpec: e, Type: adagio.Event_NODE_READY},
 					{RunID: run.Id, NodeSpec: g, Type: adagio.Event_NODE_READY},
 				},
 				RunStatus: adagio.Run_RUNNING,
@@ -200,7 +208,9 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 						"f": []byte("f"),
 					}),
 				},
-				Events: []*adagio.Event{},
+				Events: []*adagio.Event{
+					{RunID: run.Id, NodeSpec: g, Type: adagio.Event_NODE_READY},
+				},
 				Finish: map[string]adagio.Node_Result_Conclusion{
 					"g": adagio.Node_Result_SUCCESS,
 				},
@@ -271,6 +281,10 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"b": adagio.Node_Result_SUCCESS,
 				},
 				Events: []*adagio.Event{
+					// on start
+					{RunID: run.Id, NodeSpec: a, Type: adagio.Event_NODE_READY},
+					{RunID: run.Id, NodeSpec: b, Type: adagio.Event_NODE_READY},
+					// after "a" and "b" finish
 					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_NODE_READY},
 					{RunID: run.Id, NodeSpec: d, Type: adagio.Event_NODE_READY},
 					{RunID: run.Id, NodeSpec: f, Type: adagio.Event_NODE_READY},
@@ -305,6 +319,11 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"c": adagio.Node_Result_SUCCESS,
 					"d": adagio.Node_Result_FAIL,
 					"f": adagio.Node_Result_SUCCESS,
+				},
+				Events: []*adagio.Event{
+					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_NODE_READY},
+					{RunID: run.Id, NodeSpec: d, Type: adagio.Event_NODE_READY},
+					{RunID: run.Id, NodeSpec: f, Type: adagio.Event_NODE_READY},
 				},
 				RunStatus: adagio.Run_COMPLETED,
 			},
@@ -385,6 +404,10 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"b": adagio.Node_Result_SUCCESS,
 				},
 				Events: []*adagio.Event{
+					// on start
+					{RunID: run.Id, NodeSpec: a, Type: adagio.Event_NODE_READY},
+					{RunID: run.Id, NodeSpec: b, Type: adagio.Event_NODE_READY},
+					// after "a" and "b" finish
 					{RunID: run.Id, NodeSpec: h, Type: adagio.Event_NODE_READY},
 				},
 				RunStatus: adagio.Run_RUNNING,
@@ -407,6 +430,9 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"h": adagio.Node_Result_ERROR,
 				},
 				Events: []*adagio.Event{
+					// once on subscribe
+					{RunID: run.Id, NodeSpec: h, Type: adagio.Event_NODE_READY},
+					// once on retry
 					{RunID: run.Id, NodeSpec: h, Type: adagio.Event_NODE_READY},
 				},
 				RunStatus: adagio.Run_RUNNING,
@@ -429,7 +455,10 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"h": adagio.Node_Result_SUCCESS,
 				},
 				Events: []*adagio.Event{
+					// one c is ready on h success
 					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_NODE_READY},
+					// one h is ready on subscribe
+					{RunID: run.Id, NodeSpec: h, Type: adagio.Event_NODE_READY},
 				},
 				RunStatus: adagio.Run_RUNNING,
 			},
@@ -450,6 +479,10 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				},
 				Finish: map[string]adagio.Node_Result_Conclusion{
 					"c": adagio.Node_Result_SUCCESS,
+				},
+				Events: []*adagio.Event{
+					// once on subscribe
+					{RunID: run.Id, NodeSpec: c, Type: adagio.Event_NODE_READY},
 				},
 				RunStatus: adagio.Run_COMPLETED,
 			},
@@ -521,6 +554,10 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"b": adagio.Node_Result_SUCCESS,
 				},
 				Events: []*adagio.Event{
+					// on start
+					{RunID: run.Id, NodeSpec: a, Type: adagio.Event_NODE_READY},
+					{RunID: run.Id, NodeSpec: b, Type: adagio.Event_NODE_READY},
+					// after "a" and "b" finish
 					{RunID: run.Id, NodeSpec: i, Type: adagio.Event_NODE_READY},
 				},
 				RunStatus: adagio.Run_RUNNING,
@@ -543,6 +580,9 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 					"i": adagio.Node_Result_FAIL,
 				},
 				Events: []*adagio.Event{
+					// once on subscribe
+					{RunID: run.Id, NodeSpec: i, Type: adagio.Event_NODE_READY},
+					// once on retry
 					{RunID: run.Id, NodeSpec: i, Type: adagio.Event_NODE_READY},
 				},
 				RunStatus: adagio.Run_RUNNING,
@@ -563,6 +603,11 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				},
 				Finish: map[string]adagio.Node_Result_Conclusion{
 					"i": adagio.Node_Result_FAIL,
+				},
+				Events: []*adagio.Event{
+					// once on subscribe
+					{RunID: run.Id, NodeSpec: i, Type: adagio.Event_NODE_READY},
+					// c is unreachable so never becomes ready
 				},
 				RunStatus: adagio.Run_COMPLETED,
 			},
@@ -603,15 +648,23 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 		require.NotNil(t, run)
 
 		var (
-			agent     = &adagio.Agent{Id: "foo"}
-			events    = make(chan *adagio.Event, 5)
-			collected = make([]*adagio.Event, 0)
+			agent  = &adagio.Agent{Id: "foo"}
+			events = make(chan *adagio.Event, 5)
 		)
 
 		err = repo.Subscribe(agent, events, adagio.Event_NODE_READY, adagio.Event_NODE_ORPHANED)
 		require.Nil(t, err)
 
 		assert.Equal(t, adagio.Run_WAITING, run.Status)
+
+		// collect both events
+		select {
+		case event := <-events:
+			require.Equal(t, &adagio.Event{RunID: run.Id, NodeSpec: a, Type: adagio.Event_NODE_READY}, event)
+		case <-time.After(5 * time.Second):
+			t.Error("timeout collecting event")
+			return
+		}
 
 		var claims map[string]*adagio.Claim
 		t.Run("an initial claim is made", func(t *testing.T) {
@@ -622,28 +675,23 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 		// orphan claim for node "a" from run
 		orphaner.Orphan(claims[a.Name])
 
+		select {
+		case event := <-events:
+			require.Equal(t, &adagio.Event{RunID: run.Id, NodeSpec: a, Type: adagio.Event_NODE_ORPHANED}, event)
+		case <-time.After(5 * time.Second):
+			t.Error("timeout collecting event")
+			return
+		}
+
 		t.Run("the orphaned node", func(t *testing.T) {
 			// ensure orphaned node can be claimed again and has no results yet
 			claims = canClaim(t, repo, run, map[string]*adagio.Node{"a": running(a, nil)})
 		})
 
 		// can error the node
-		canFinish(t, repo, run, map[string]adagio.Node_Result_Conclusion{"a": adagio.Node_Result_ERROR}, claims)
-
-		select {
-		case event := <-events:
-			collected = append(collected, event)
-		case <-time.After(5 * time.Second):
-			t.Error("timeout collecting events")
-			return
-		}
-
-		expected := []*adagio.Event{
-			{RunID: run.Id, NodeSpec: a, Type: adagio.Event_NODE_ORPHANED},
-		}
-		if !assert.Equal(t, expected, collected) {
-			fmt.Println(pretty.Diff(expected, collected))
-		}
+		canFinish(t, repo, run, map[string]adagio.Node_Result_Conclusion{
+			"a": adagio.Node_Result_ERROR,
+		}, claims)
 
 		t.Run("the run is listed", func(t *testing.T) {
 			runs, err := repo.ListRuns()
@@ -721,6 +769,7 @@ func (l *TestLayer) Exec(t *testing.T) {
 		case event := <-events:
 			collected = append(collected, event)
 		case <-time.After(5 * time.Second):
+			fmt.Printf("collected so far %#v", collected)
 			t.Error("timeout collecting events")
 			return
 		}
