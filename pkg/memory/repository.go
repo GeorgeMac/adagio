@@ -329,6 +329,19 @@ func (r *Repository) Subscribe(agent *adagio.Agent, events chan<- *adagio.Event,
 	r.agents[agent.Id] = agent
 
 	for _, typ := range types {
+		if typ == adagio.Event_NODE_READY {
+			for _, state := range r.runs {
+				for _, node := range state.lookup {
+					if node.Status == adagio.Node_READY {
+						events <- &adagio.Event{
+							RunID:    state.run.Id,
+							NodeSpec: node.Spec,
+							Type:     adagio.Event_NODE_READY,
+						}
+					}
+				}
+			}
+		}
 		r.listeners[typ] = append(r.listeners[typ], events)
 	}
 
