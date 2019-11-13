@@ -7,35 +7,49 @@ import (
 	runtime "github.com/georgemac/adagio/pkg/runtimes"
 )
 
-type Runtime struct {
-	spec    *runtime.Spec
-	command runtime.StringField
-	args    runtime.StringsField
+// Call is a structure which contains the arguments
+// for an exec package runtime call
+type Call struct {
+	*runtime.Builder
+	Command string
+	Args    []string
 }
 
-func New() *Runtime {
-	spec := runtime.NewSpec("exec")
-
-	return &Runtime{
-		command: spec.String("command", true, ""),
-		args:    spec.Strings("args", false, []string{}),
-	}
+// NewCall configures a new exec.Call pointer
+func NewCall(command string, args ...string) *Call {
+	call := newCall()
+	call.Command = command
+	call.Args = args
+	return call
 }
 
+func newCall() *Call {
+	c := &Call{Builder: runtime.NewBuilder("exec")}
+
+	c.String("command", true, "")(&c.Command)
+	c.Strings("args", false)(&c.Args)
+
+	return c
+}
+
+// Runtime is a struct which implements the worker.Runtime
+// It executes the work for a provided node on a call to Run
+// and uses the os/exec package to invoke a subprocess
+type Runtime struct{}
+
+// NewRuntime configures and returns a new Runtime pointer
+func NewRuntime() *Runtime {
+	return &Runtime{}
+}
+
+// Run parses the command and arguments from the provided Node and then
+// spawns a subprocess for the desired command and returns the combined
+// output writer as an adagio Result output
 func (r *Runtime) Run(n *adagio.Node) (*adagio.Result, error) {
-	var (
-		command string
-		args    []string
-	)
+	call := newCall()
+	call.Parse(n.Spec)
 
-	if err := runtime.Parse(n.Spec,
-		r.command(&command),
-		r.args(&args)); err != nil {
-
-		return nil, err
-	}
-
-	data, err := exec.Command(command, args...).CombinedOutput()
+	data, err := exec.Command(call.Command, call.Args...).CombinedOutput()
 	if err != nil {
 		return nil, err
 	}

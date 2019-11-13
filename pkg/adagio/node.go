@@ -2,6 +2,18 @@ package adagio
 
 import "strings"
 
+// RetryCondition is a key used in the node spec retry map
+type RetryCondition string
+
+const (
+	// OnFail is the retry condition where a node results in a
+	// failure
+	OnFail RetryCondition = "fail"
+	// OnError is the retry condition where a node results in a
+	// system related error
+	OnError RetryCondition = "error"
+)
+
 // CanRetry returns true if the node can be retried
 func CanRetry(node *Node) (canRetry bool) {
 	VisitLatestAttempt(node, func(result *Node_Result) {

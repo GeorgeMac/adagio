@@ -9,6 +9,8 @@ services:
       - -backend-type=etcd
       - -etcd-addresses=http://etcd:2379
       - api
+    ports:
+      - "7890:7890"
     restart: always
   agent:
     build:

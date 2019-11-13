@@ -162,11 +162,12 @@ func (p *Pool) handleEvent(claimer Claimer, event *adagio.Event) error {
 	switch event.Type {
 	case adagio.Event_NODE_READY:
 		var result *adagio.Result
-		result, err = runtime.Run(node)
-		nodeResult = &adagio.Node_Result{
-			Conclusion: adagio.Node_Result_Conclusion(result.Conclusion),
-			Metadata:   result.Metadata,
-			Output:     result.Output,
+		if result, err = runtime.Run(node); err == nil {
+			nodeResult = &adagio.Node_Result{
+				Conclusion: adagio.Node_Result_Conclusion(result.Conclusion),
+				Metadata:   result.Metadata,
+				Output:     result.Output,
+			}
 		}
 
 	case adagio.Event_NODE_ORPHANED:

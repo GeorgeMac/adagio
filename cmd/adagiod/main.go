@@ -2,11 +2,9 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"log"
-	"math/rand"
 	"net"
 	"os"
 	"os/signal"
@@ -15,10 +13,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/georgemac/adagio/pkg/adagio"
 	"github.com/georgemac/adagio/pkg/etcd"
 	"github.com/georgemac/adagio/pkg/memory"
 	"github.com/georgemac/adagio/pkg/rpc/controlplane"
+	"github.com/georgemac/adagio/pkg/runtimes/debug"
 	"github.com/georgemac/adagio/pkg/runtimes/exec"
 	controlservice "github.com/georgemac/adagio/pkg/service/controlplane"
 	"github.com/georgemac/adagio/pkg/worker"
@@ -151,35 +149,8 @@ func api(ctxt context.Context, repo controlservice.Repository) {
 func agent(ctxt context.Context, repo worker.Repository) {
 	var (
 		runtimes = map[string]worker.Runtime{
-			"echo": worker.RuntimeFunc(func(node *adagio.Node) (*adagio.Result, error) {
-				return &adagio.Result{
-					Conclusion: adagio.Result_SUCCESS,
-					Output:     []byte(node.Spec.Name),
-				}, nil
-			}),
-			"flakey": worker.RuntimeFunc(func(node *adagio.Node) (*adagio.Result, error) {
-				if rand.Intn(2) > 0 {
-					return &adagio.Result{Conclusion: adagio.Result_FAIL}, nil
-				}
-
-				return &adagio.Result{Conclusion: adagio.Result_SUCCESS}, nil
-			}),
-			"fail": worker.RuntimeFunc(func(node *adagio.Node) (*adagio.Result, error) {
-				return &adagio.Result{Conclusion: adagio.Result_FAIL}, nil
-			}),
-			"error": worker.RuntimeFunc(func(node *adagio.Node) (*adagio.Result, error) {
-				return &adagio.Result{}, errors.New("something went wrong")
-			}),
-			"panic": worker.RuntimeFunc(func(node *adagio.Node) (*adagio.Result, error) {
-				r := rand.New(rand.NewSource(time.Now().UnixNano()))
-				if x := r.Intn(10); x > 4 {
-					fmt.Println("got:", x)
-					panic("uh oh")
-				}
-
-				return &adagio.Result{Conclusion: adagio.Result_SUCCESS}, nil
-			}),
-			"exec": exec.New(),
+			"debug": debug.NewRuntime(),
+			"exec":  exec.NewRuntime(),
 		}
 	)
 
