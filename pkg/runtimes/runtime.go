@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
 )
@@ -30,8 +31,10 @@ const (
 	StringFieldType FieldType = iota
 	// StringsFieldType represents a slice of string types field
 	StringsFieldType
-	// Int64FieldType represents ant int64 type field
+	// Int64FieldType represents an int64 type field
 	Int64FieldType
+	// TimeFieldType represent a time.Time type field
+	TimeFieldType
 )
 
 // Builder is a struct aids in both parsing and construction
@@ -205,6 +208,45 @@ func (s *Builder) Int64(name string, required bool, defaultValue int64) Int64Fie
 			}
 
 			*v, err = strconv.ParseInt(vs[0], 10, 64)
+
+			return err
+		}
+
+		return field
+	}
+}
+
+// TimeField is a function which takes a int64 pointer
+// and returns a Field pointers which will set and get from
+// the provided pointer
+type TimeField func(*time.Time) *Field
+
+// Time configures a TimeField which when call with a int64 pointer
+// will set the pointer on calls to builder.Parse() and read the value
+// at the end of the pointer on calls to builder.Spec()
+func (s *Builder) Time(name string, required bool, defaultValue time.Time) TimeField {
+	field := newField(name, TimeFieldType, required, []string{defaultValue.Format(time.RFC3339Nano)})
+	s.fields = append(s.fields, field)
+
+	return func(v *time.Time) *Field {
+		field.values = func() ([]string, error) {
+			if v == nil {
+				if required {
+					return nil, errors.New("field is required")
+				}
+
+				return nil, nil
+			}
+
+			return []string{v.Format(time.RFC3339Nano)}, nil
+		}
+
+		field.parse = func(vs []string) (err error) {
+			if len(vs) < 1 {
+				return errors.New("no value set for key")
+			}
+
+			*v, err = time.Parse(time.RFC3339Nano, vs[0])
 
 			return err
 		}

@@ -2,10 +2,13 @@ package runtime
 
 import (
 	"testing"
+	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
 	"github.com/stretchr/testify/assert"
 )
+
+var defaultTime = time.Date(2019, 7, 10, 10, 0, 0, 50, time.UTC)
 
 func Test_Builder_Spec(t *testing.T) {
 	for _, testCase := range []struct {
@@ -21,11 +24,13 @@ func Test_Builder_Spec(t *testing.T) {
 					stringField  = "a_string"
 					stringsField = []string{"a", "b", "c"}
 					int64Field   = int64(12345)
+					timeField    = time.Date(2019, 1, 1, 10, 0, 0, 75, time.UTC)
 				)
 
 				builder.String("string_field", false, "")(&stringField)
 				builder.Strings("strings_field", false)(&stringsField)
 				builder.Int64("int64_field", false, 0)(&int64Field)
+				builder.Time("time_field", false, defaultTime)(&timeField)
 
 				return builder
 			},
@@ -40,6 +45,9 @@ func Test_Builder_Spec(t *testing.T) {
 					},
 					"adagio.runtime.foo.int64_field": &adagio.MetadataValue{
 						Values: []string{"12345"},
+					},
+					"adagio.runtime.foo.time_field": &adagio.MetadataValue{
+						Values: []string{"2019-01-01T10:00:00.000000075Z"},
 					},
 				},
 			},
@@ -77,6 +85,9 @@ func Test_Builder_Parse(t *testing.T) {
 					"adagio.runtime.foo.int64_field": &adagio.MetadataValue{
 						Values: []string{"12345"},
 					},
+					"adagio.runtime.foo.time_field": &adagio.MetadataValue{
+						Values: []string{"2019-07-10T10:00:00.000000050Z"},
+					},
 				},
 			},
 			setup: func() (*Builder, func(*testing.T)) {
@@ -85,16 +96,19 @@ func Test_Builder_Parse(t *testing.T) {
 					stringField  string
 					stringsField []string
 					int64Field   int64
+					timeField    time.Time
 				)
 
 				builder.String("string_field", false, "")(&stringField)
 				builder.Strings("strings_field", false)(&stringsField)
 				builder.Int64("int64_field", false, 0)(&int64Field)
+				builder.Time("time_field", false, defaultTime)(&timeField)
 
 				return builder, func(t *testing.T) {
 					assert.Equal(t, "a_string", stringField)
 					assert.Equal(t, []string{"a", "b", "c"}, stringsField)
 					assert.Equal(t, int64(12345), int64Field)
+					assert.Equal(t, defaultTime, timeField)
 				}
 			},
 		},
