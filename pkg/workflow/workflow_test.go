@@ -21,7 +21,7 @@ func Test_Builder_Simple(t *testing.T) {
 		}
 		dSpec = &adagio.Node_Spec{Name: "d"}
 
-		emptySpec = SpecerFunc(func() (*adagio.Node_Spec, error) {
+		emptySpec = SpecBuilderFunc(func() (*adagio.Node_Spec, error) {
 			return &adagio.Node_Spec{}, nil
 		})
 

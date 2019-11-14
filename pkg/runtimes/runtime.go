@@ -58,9 +58,9 @@ func (p *Builder) fieldName(field *Field) string {
 	return fmt.Sprintf("adagio.runtime.%s.%s", p.name, field.Name)
 }
 
-// Spec constructs a Node_Spec based on the current state
+// NewSpec constructs a Node_Spec based on the current state
 // of the builders fields
-func (p *Builder) Spec() (*adagio.Node_Spec, error) {
+func (p *Builder) NewSpec() (*adagio.Node_Spec, error) {
 	spec := &adagio.Node_Spec{Runtime: p.name}
 	for _, field := range p.fields {
 		values, err := field.Values()
@@ -78,11 +78,11 @@ func (p *Builder) Spec() (*adagio.Node_Spec, error) {
 	return spec, nil
 }
 
-// Parse parses the state from a node spec into the targets
+// Parse parses the state from a node into the targets
 // set on the builders fields
-func (p *Builder) Parse(spec *adagio.Node_Spec) error {
+func (p *Builder) Parse(node *adagio.Node) error {
 	for _, field := range p.fields {
-		values, ok := spec.Metadata[p.fieldName(field)]
+		values, ok := node.Spec.Metadata[p.fieldName(field)]
 		if !ok {
 			if field.Required {
 				return errors.New("key not found")

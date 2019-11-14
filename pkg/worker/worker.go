@@ -31,14 +31,9 @@ type Repository interface {
 
 // Runtime is a type which can execute a node and produce a result
 type Runtime interface {
-	Run(*adagio.Node) (*adagio.Result, error)
+	Parse(*adagio.Node) error
+	Run() (*adagio.Result, error)
 }
-
-// RuntimeFunc is a function which can be used as a Runtime
-type RuntimeFunc func(*adagio.Node) (*adagio.Result, error)
-
-// Run delegates to the wrapped RuntimeFunc
-func (fn RuntimeFunc) Run(n *adagio.Node) (*adagio.Result, error) { return fn(n) }
 
 // Claimer is used to generate claims
 type Claimer interface {
@@ -56,7 +51,7 @@ func (fn ClaimerFunc) NewClaim() *adagio.Claim { return fn() }
 // process them
 type Pool struct {
 	repo     Repository
-	runtimes map[string]Runtime
+	runtimes map[string]func() Runtime
 
 	size int
 
@@ -64,7 +59,7 @@ type Pool struct {
 }
 
 // NewPool constructs and configures a new node pool for execution
-func NewPool(repo Repository, runtimes map[string]Runtime, opts ...Option) *Pool {
+func NewPool(repo Repository, runtimes map[string]func() Runtime, opts ...Option) *Pool {
 	pool := &Pool{
 		repo:     repo,
 		runtimes: runtimes,
@@ -161,12 +156,18 @@ func (p *Pool) handleEvent(claimer Claimer, event *adagio.Event) error {
 
 	switch event.Type {
 	case adagio.Event_NODE_READY:
-		var result *adagio.Result
-		if result, err = runtime.Run(node); err == nil {
-			nodeResult = &adagio.Node_Result{
-				Conclusion: adagio.Node_Result_Conclusion(result.Conclusion),
-				Metadata:   result.Metadata,
-				Output:     result.Output,
+		var (
+			result *adagio.Result
+			runner = runtime()
+		)
+
+		if err = runner.Parse(node); err == nil {
+			if result, err = runner.Run(); err == nil {
+				nodeResult = &adagio.Node_Result{
+					Conclusion: adagio.Node_Result_Conclusion(result.Conclusion),
+					Metadata:   result.Metadata,
+					Output:     result.Output,
+				}
 			}
 		}
 

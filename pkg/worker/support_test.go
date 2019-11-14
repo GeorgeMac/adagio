@@ -6,6 +6,14 @@ import (
 	"github.com/georgemac/adagio/pkg/adagio"
 )
 
+type runtime struct {
+	parse func(*adagio.Node) error
+	run   func() (*adagio.Result, error)
+}
+
+func (r runtime) Parse(n *adagio.Node) error   { return r.parse(n) }
+func (r runtime) Run() (*adagio.Result, error) { return r.run() }
+
 type repository struct {
 	mu sync.Mutex
 

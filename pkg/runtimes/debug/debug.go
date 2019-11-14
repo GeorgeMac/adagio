@@ -9,6 +9,13 @@ import (
 
 	"github.com/georgemac/adagio/pkg/adagio"
 	runtime "github.com/georgemac/adagio/pkg/runtimes"
+	"github.com/georgemac/adagio/pkg/worker"
+	"github.com/georgemac/adagio/pkg/workflow"
+)
+
+var (
+	_ worker.Runtime       = (*Call)(nil)
+	_ workflow.SpecBuilder = (*Call)(nil)
 )
 
 // Call is a structure which contains the arguments
@@ -87,7 +94,7 @@ func With(chances ...ChanceCondition) Option {
 // e.g. With(Chance(0.5, Panic)) will result in the runtime
 // causing a panic 50% of the time
 func NewCall(conclusion adagio.Result_Conclusion, opts ...Option) *Call {
-	call := newCall()
+	call := BlankCall()
 	call.Conclusion = strings.ToLower(conclusion.String())
 
 	Options(opts).Apply(call)
@@ -95,7 +102,7 @@ func NewCall(conclusion adagio.Result_Conclusion, opts ...Option) *Call {
 	return call
 }
 
-func newCall() *Call {
+func BlankCall() *Call {
 	c := &Call{Builder: runtime.NewBuilder("debug")}
 
 	c.String("conclusion", false, "success")(&c.Conclusion)
@@ -105,26 +112,12 @@ func newCall() *Call {
 	return c
 }
 
-// Runtime is a struct which implements the worker.Runtime
-// It executes a specification for a debug task. This task
-// mostly reports back whatever it is told, along with sleeping
-// for a configured amount of time.
-type Runtime struct{}
-
-// NewRuntime configures and returns a new Runtime pointer
-func NewRuntime() *Runtime {
-	return &Runtime{}
-}
-
-// Run parse the debug run from the provided Node and then
-// invokes the desired operations. It first sleeps the configured ammount
-// and then loops over any provided chance conditions.
+// Run invokes the desired debug operations.
+// It first sleeps the configured amount and
+// then loops over any provided chance conditions.
 // Given no chance condinition is met it returns the configured
 // adagio result conclusion
-func (r *Runtime) Run(n *adagio.Node) (*adagio.Result, error) {
-	call := newCall()
-	call.Parse(n.Spec)
-
+func (call *Call) Run() (*adagio.Result, error) {
 	time.Sleep(time.Duration(call.Sleep))
 
 	for _, c := range call.Chances {

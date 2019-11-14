@@ -7,10 +7,10 @@ import (
 	"github.com/georgemac/adagio/pkg/rpc/controlplane"
 )
 
-// Specer is any type which can produce an adagio Node_Spec
+// SpecBuilder is any type which can produce an adagio Node_Spec
 // pointer
-type Specer interface {
-	Spec() (*adagio.Node_Spec, error)
+type SpecBuilder interface {
+	NewSpec() (*adagio.Node_Spec, error)
 }
 
 // Option is a functional option for a node spec
@@ -59,10 +59,10 @@ func MustNode(n Node, err error) Node {
 	return n
 }
 
-// Node creates a node from a provided name and Specer type
+// Node creates a node from a provided name and SpecBuilder type
 // it also applies any provided options
-func (b Builder) Node(name string, s Specer, opts ...Option) (n Node, err error) {
-	spec, err := s.Spec()
+func (b Builder) Node(name string, s SpecBuilder, opts ...Option) (n Node, err error) {
+	spec, err := s.NewSpec()
 	if err != nil {
 		return Node{}, err
 	}

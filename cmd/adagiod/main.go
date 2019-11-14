@@ -148,9 +148,9 @@ func api(ctxt context.Context, repo controlservice.Repository) {
 
 func agent(ctxt context.Context, repo worker.Repository) {
 	var (
-		runtimes = map[string]worker.Runtime{
-			"debug": debug.NewRuntime(),
-			"exec":  exec.NewRuntime(),
+		runtimes = map[string]func() worker.Runtime{
+			"debug": func() worker.Runtime { return debug.BlankCall() },
+			"exec":  func() worker.Runtime { return exec.BlankCall() },
 		}
 	)
 

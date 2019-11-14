@@ -56,7 +56,7 @@ func Test_Builder_Spec(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			b := testCase.setup()
 
-			spec, err := b.Spec()
+			spec, err := b.NewSpec()
 			assert.Nil(t, err)
 
 			assert.Equal(t, testCase.spec, spec)
@@ -142,7 +142,7 @@ func Test_Builder_Parse(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			builder, assert := testCase.setup()
 
-			builder.Parse(testCase.spec)
+			builder.Parse(&adagio.Node{Spec: testCase.spec})
 
 			assert(t)
 		})
