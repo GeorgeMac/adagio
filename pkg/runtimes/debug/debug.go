@@ -9,7 +9,56 @@ import (
 
 	"github.com/georgemac/adagio/pkg/adagio"
 	runtime "github.com/georgemac/adagio/pkg/runtimes"
+	"github.com/georgemac/adagio/pkg/worker"
+	"github.com/georgemac/adagio/pkg/workflow"
 )
+
+const name = "debug"
+
+var (
+	_ worker.Runtime       = (*Runtime)(nil)
+	_ worker.Call          = (*Call)(nil)
+	_ workflow.SpecBuilder = (*Call)(nil)
+)
+
+// Runtime is a type which can be registered on a RuntimeMap
+// and can create calls
+type Runtime struct{}
+
+// Name returns "debug" the name of this runtime
+func (r Runtime) Name() string { return name }
+
+// BlankCall constructs a default blank Call
+func (r Runtime) BlankCall() worker.Call {
+	return blankCall()
+}
+
+func blankCall() *Call {
+	c := &Call{Builder: runtime.NewBuilder(name)}
+
+	c.String("conclusion", false, "success")(&c.Conclusion)
+	c.Int64("sleep", false, 0)(&c.Sleep)
+	c.Strings("chances", false)(&c.Chances)
+
+	return c
+}
+
+// NewCall constructure and configures a new Call pointer
+// The call will result in the provided conclusion unless
+// one of zero or more chance conditions come true. In the
+// case a chance condition is true, the result within the
+// condition is made instead.
+//
+// e.g. With(Chance(0.5, Panic)) will result in the runtime
+// causing a panic 50% of the time
+func NewCall(conclusion adagio.Result_Conclusion, opts ...Option) *Call {
+	call := blankCall()
+	call.Conclusion = strings.ToLower(conclusion.String())
+
+	Options(opts).Apply(call)
+
+	return call
+}
 
 // Call is a structure which contains the arguments
 // for a debug package runtime call
@@ -78,53 +127,12 @@ func With(chances ...ChanceCondition) Option {
 	}
 }
 
-// NewCall constructure and configures a new Call pointer
-// The call will result in the provided conclusion unless
-// one of zero or more chance conditions come true. In the
-// case a chance condition is true, the result within the
-// condition is made instead.
-//
-// e.g. With(Chance(0.5, Panic)) will result in the runtime
-// causing a panic 50% of the time
-func NewCall(conclusion adagio.Result_Conclusion, opts ...Option) *Call {
-	call := newCall()
-	call.Conclusion = strings.ToLower(conclusion.String())
-
-	Options(opts).Apply(call)
-
-	return call
-}
-
-func newCall() *Call {
-	c := &Call{Builder: runtime.NewBuilder("debug")}
-
-	c.String("conclusion", false, "success")(&c.Conclusion)
-	c.Int64("sleep", false, 0)(&c.Sleep)
-	c.Strings("chances", false)(&c.Chances)
-
-	return c
-}
-
-// Runtime is a struct which implements the worker.Runtime
-// It executes a specification for a debug task. This task
-// mostly reports back whatever it is told, along with sleeping
-// for a configured amount of time.
-type Runtime struct{}
-
-// NewRuntime configures and returns a new Runtime pointer
-func NewRuntime() *Runtime {
-	return &Runtime{}
-}
-
-// Run parse the debug run from the provided Node and then
-// invokes the desired operations. It first sleeps the configured ammount
-// and then loops over any provided chance conditions.
+// Run invokes the desired debug operations.
+// It first sleeps the configured amount and
+// then loops over any provided chance conditions.
 // Given no chance condinition is met it returns the configured
 // adagio result conclusion
-func (r *Runtime) Run(n *adagio.Node) (*adagio.Result, error) {
-	call := newCall()
-	call.Parse(n.Spec)
-
+func (call *Call) Run() (*adagio.Result, error) {
 	time.Sleep(time.Duration(call.Sleep))
 
 	for _, c := range call.Chances {

@@ -20,18 +20,31 @@ func TestPool_HappyPath_NODE_READY(t *testing.T) {
 			},
 		}
 
-		runtimeCalls uint64
+		parseCalls uint64
+		runCalls   uint64
 
 		runtimes = map[string]Runtime{
-			"test": RuntimeFunc(func(n *adagio.Node) (*adagio.Result, error) {
-				require.Equal(t, n, node)
+			"test": runtime{
+				name: "test",
+				newCall: func() Call {
+					return call{
+						parse: func(n *adagio.Node) error {
+							atomic.AddUint64(&parseCalls, 1)
 
-				atomic.AddUint64(&runtimeCalls, 1)
+							require.Equal(t, n, node)
 
-				return &adagio.Result{
-					Conclusion: adagio.Result_SUCCESS,
-				}, nil
-			}),
+							return nil
+						},
+						run: func() (*adagio.Result, error) {
+							atomic.AddUint64(&runCalls, 1)
+
+							return &adagio.Result{
+								Conclusion: adagio.Result_SUCCESS,
+							}, nil
+						},
+					}
+				},
+			},
 		}
 
 		// new repository which expects 5 subscriptions
@@ -44,7 +57,7 @@ func TestPool_HappyPath_NODE_READY(t *testing.T) {
 			})
 		}
 
-		pool = NewPool(&repo, runtimes, WithWorkerCount(5), WithClaimerFunc(claimFunc))
+		pool = NewPool(&repo, RuntimeMap(runtimes), WithWorkerCount(5), WithClaimerFunc(claimFunc))
 
 		done         = make(chan struct{})
 		ctxt, cancel = context.WithCancel(context.Background())
@@ -93,7 +106,8 @@ func TestPool_HappyPath_NODE_READY(t *testing.T) {
 	}, claim}, repo.finishCalls[0])
 
 	// ensure runtime was invoked once
-	assert.Equal(t, uint64(1), runtimeCalls)
+	assert.Equal(t, uint64(1), parseCalls)
+	assert.Equal(t, uint64(1), runCalls)
 }
 
 func TestPool_Error_RuntimeDoesNotExist(t *testing.T) {
@@ -105,16 +119,31 @@ func TestPool_Error_RuntimeDoesNotExist(t *testing.T) {
 			},
 		}
 
-		runtimeCalls uint64
+		runCalls   uint64
+		parseCalls uint64
 
 		runtimes = map[string]Runtime{
-			"known": RuntimeFunc(func(n *adagio.Node) (*adagio.Result, error) {
-				atomic.AddUint64(&runtimeCalls, 1)
+			"known": runtime{
+				name: "known",
+				newCall: func() Call {
+					return call{
+						parse: func(n *adagio.Node) error {
+							atomic.AddUint64(&parseCalls, 1)
 
-				return &adagio.Result{
-					Conclusion: adagio.Result_SUCCESS,
-				}, nil
-			}),
+							require.Equal(t, n, node)
+
+							return nil
+						},
+						run: func() (*adagio.Result, error) {
+							atomic.AddUint64(&runCalls, 1)
+
+							return &adagio.Result{
+								Conclusion: adagio.Result_SUCCESS,
+							}, nil
+						},
+					}
+				},
+			},
 		}
 
 		// new repository which expects 5 subscriptions
@@ -171,7 +200,8 @@ func TestPool_Error_RuntimeDoesNotExist(t *testing.T) {
 	require.Nil(t, repo.finishCalls)
 
 	// ensure runtime was never invoked
-	assert.Equal(t, uint64(0), runtimeCalls)
+	assert.Equal(t, uint64(0), runCalls)
+	assert.Equal(t, uint64(0), parseCalls)
 }
 
 func TestPool_Error_RuntimeError(t *testing.T) {
@@ -183,14 +213,29 @@ func TestPool_Error_RuntimeError(t *testing.T) {
 			},
 		}
 
-		runtimeCalls uint64
+		runCalls   uint64
+		parseCalls uint64
 
 		runtimes = map[string]Runtime{
-			"error": RuntimeFunc(func(n *adagio.Node) (*adagio.Result, error) {
-				atomic.AddUint64(&runtimeCalls, 1)
+			"error": runtime{
+				name: "error",
+				newCall: func() Call {
+					return call{
+						parse: func(n *adagio.Node) error {
+							atomic.AddUint64(&parseCalls, 1)
 
-				return &adagio.Result{}, errors.New("something went wrong")
-			}),
+							require.Equal(t, n, node)
+
+							return nil
+						},
+						run: func() (*adagio.Result, error) {
+							atomic.AddUint64(&runCalls, 1)
+
+							return nil, errors.New("something went wrong")
+						},
+					}
+				},
+			},
 		}
 
 		// new repository which expects 5 subscriptions
@@ -251,7 +296,8 @@ func TestPool_Error_RuntimeError(t *testing.T) {
 	}, claim}, repo.finishCalls[0])
 
 	// ensure runtime was never invoked
-	assert.Equal(t, uint64(1), runtimeCalls)
+	assert.Equal(t, uint64(1), runCalls)
+	assert.Equal(t, uint64(1), parseCalls)
 }
 
 func TestPool_Error_NODE_ORPHANED(t *testing.T) {
@@ -263,16 +309,31 @@ func TestPool_Error_NODE_ORPHANED(t *testing.T) {
 			},
 		}
 
-		runtimeCalls uint64
+		runCalls   uint64
+		parseCalls uint64
 
 		runtimes = map[string]Runtime{
-			"test": RuntimeFunc(func(n *adagio.Node) (*adagio.Result, error) {
-				atomic.AddUint64(&runtimeCalls, 1)
+			"test": runtime{
+				name: "test",
+				newCall: func() Call {
+					return call{
+						parse: func(n *adagio.Node) error {
+							atomic.AddUint64(&parseCalls, 1)
 
-				return &adagio.Result{
-					Conclusion: adagio.Result_SUCCESS,
-				}, nil
-			}),
+							require.Equal(t, n, node)
+
+							return nil
+						},
+						run: func() (*adagio.Result, error) {
+							atomic.AddUint64(&runCalls, 1)
+
+							return &adagio.Result{
+								Conclusion: adagio.Result_SUCCESS,
+							}, nil
+						},
+					}
+				},
+			},
 		}
 
 		// new repository which expects 5 subscriptions
@@ -333,5 +394,6 @@ func TestPool_Error_NODE_ORPHANED(t *testing.T) {
 	}, claim}, repo.finishCalls[0])
 
 	// ensure runtime was never invoked
-	assert.Equal(t, uint64(0), runtimeCalls)
+	assert.Equal(t, uint64(0), runCalls)
+	assert.Equal(t, uint64(0), parseCalls)
 }

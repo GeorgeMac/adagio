@@ -8,16 +8,17 @@ import (
 	"google.golang.org/grpc"
 )
 
-func spec(s *adagio.Node_Spec) Specer {
-	return SpecerFunc(func() (*adagio.Node_Spec, error) {
+func spec(s *adagio.Node_Spec) SpecBuilder {
+	return SpecBuilderFunc(func(name string) (*adagio.Node_Spec, error) {
+		s.Name = name
 		return s, nil
 	})
 }
 
-type SpecerFunc func() (*adagio.Node_Spec, error)
+type SpecBuilderFunc func(string) (*adagio.Node_Spec, error)
 
-func (s SpecerFunc) Spec() (*adagio.Node_Spec, error) {
-	return s()
+func (s SpecBuilderFunc) NewSpec(name string) (*adagio.Node_Spec, error) {
+	return s(name)
 }
 
 type client struct {

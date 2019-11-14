@@ -35,6 +35,7 @@ func Test_Builder_Spec(t *testing.T) {
 				return builder
 			},
 			spec: &adagio.Node_Spec{
+				Name:    "happy path",
 				Runtime: "foo",
 				Metadata: map[string]*adagio.MetadataValue{
 					"adagio.runtime.foo.string_field": &adagio.MetadataValue{
@@ -56,7 +57,7 @@ func Test_Builder_Spec(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			b := testCase.setup()
 
-			spec, err := b.Spec()
+			spec, err := b.NewSpec(testCase.name)
 			assert.Nil(t, err)
 
 			assert.Equal(t, testCase.spec, spec)
@@ -142,7 +143,7 @@ func Test_Builder_Parse(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			builder, assert := testCase.setup()
 
-			builder.Parse(testCase.spec)
+			builder.Parse(&adagio.Node{Spec: testCase.spec})
 
 			assert(t)
 		})

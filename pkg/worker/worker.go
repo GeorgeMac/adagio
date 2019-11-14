@@ -29,16 +29,26 @@ type Repository interface {
 	UnsubscribeAll(*adagio.Agent, chan<- *adagio.Event) error
 }
 
-// Runtime is a type which can execute a node and produce a result
-type Runtime interface {
-	Run(*adagio.Node) (*adagio.Result, error)
+// RuntimeMap is a set of runtimes identified by name
+type RuntimeMap map[string]Runtime
+
+// Register adds the runtime to the RuntimeMap
+func (m RuntimeMap) Register(r Runtime) {
+	m[r.Name()] = r
 }
 
-// RuntimeFunc is a function which can be used as a Runtime
-type RuntimeFunc func(*adagio.Node) (*adagio.Result, error)
+// Runtime is a type with a name which can generate
+// new runtime calls
+type Runtime interface {
+	Name() string
+	BlankCall() Call
+}
 
-// Run delegates to the wrapped RuntimeFunc
-func (fn RuntimeFunc) Run(n *adagio.Node) (*adagio.Result, error) { return fn(n) }
+// Call is a type which can parse and execute a node
+type Call interface {
+	Parse(*adagio.Node) error
+	Run() (*adagio.Result, error)
+}
 
 // Claimer is used to generate claims
 type Claimer interface {
@@ -56,7 +66,7 @@ func (fn ClaimerFunc) NewClaim() *adagio.Claim { return fn() }
 // process them
 type Pool struct {
 	repo     Repository
-	runtimes map[string]Runtime
+	runtimes RuntimeMap
 
 	size int
 
@@ -64,7 +74,7 @@ type Pool struct {
 }
 
 // NewPool constructs and configures a new node pool for execution
-func NewPool(repo Repository, runtimes map[string]Runtime, opts ...Option) *Pool {
+func NewPool(repo Repository, runtimes RuntimeMap, opts ...Option) *Pool {
 	pool := &Pool{
 		repo:     repo,
 		runtimes: runtimes,
@@ -161,12 +171,18 @@ func (p *Pool) handleEvent(claimer Claimer, event *adagio.Event) error {
 
 	switch event.Type {
 	case adagio.Event_NODE_READY:
-		var result *adagio.Result
-		if result, err = runtime.Run(node); err == nil {
-			nodeResult = &adagio.Node_Result{
-				Conclusion: adagio.Node_Result_Conclusion(result.Conclusion),
-				Metadata:   result.Metadata,
-				Output:     result.Output,
+		var (
+			result *adagio.Result
+			call   = runtime.BlankCall()
+		)
+
+		if err = call.Parse(node); err == nil {
+			if result, err = call.Run(); err == nil {
+				nodeResult = &adagio.Node_Result{
+					Conclusion: adagio.Node_Result_Conclusion(result.Conclusion),
+					Metadata:   result.Metadata,
+					Output:     result.Output,
+				}
 			}
 		}
 

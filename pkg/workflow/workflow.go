@@ -7,10 +7,10 @@ import (
 	"github.com/georgemac/adagio/pkg/rpc/controlplane"
 )
 
-// Specer is any type which can produce an adagio Node_Spec
+// SpecBuilder is any type which can produce an adagio Node_Spec
 // pointer
-type Specer interface {
-	Spec() (*adagio.Node_Spec, error)
+type SpecBuilder interface {
+	NewSpec(name string) (*adagio.Node_Spec, error)
 }
 
 // Option is a functional option for a node spec
@@ -44,6 +44,7 @@ func WithRetry(condition adagio.RetryCondition, maxAttempts int32) Option {
 // built graph spec onto a client which produces a new Run
 type Builder struct {
 	spec *adagio.GraphSpec
+	err  error
 }
 
 // NewBuilder creates and configures a new Builder
@@ -59,17 +60,19 @@ func MustNode(n Node, err error) Node {
 	return n
 }
 
-// Node creates a node from a provided name and Specer type
+// Node creates a node from a provided name and SpecBuilder type
 // it also applies any provided options
-func (b Builder) Node(name string, s Specer, opts ...Option) (n Node, err error) {
-	spec, err := s.Spec()
-	if err != nil {
-		return Node{}, err
+func (b Builder) Node(name string, s SpecBuilder, opts ...Option) (n Node) {
+	if b.err != nil {
+		return
 	}
 
-	spec.Name = name
+	n.spec, b.err = s.NewSpec(name)
+	if b.err != nil {
+		return
+	}
 
-	n = Node{builder: b, spec: spec}
+	n.builder = b
 
 	Options(opts).Apply(n.spec)
 
@@ -99,6 +102,11 @@ type Node struct {
 // DependsOn creates a connection from the provided nodes (sources)
 // to the callee node (destination) on the original builder
 func (n Node) DependsOn(nodes ...Node) {
+	// escape early if error on builder
+	if n.builder.err != nil {
+		return
+	}
+
 	for _, v := range nodes {
 		n.builder.spec.Edges = append(n.builder.spec.Edges, &adagio.Edge{
 			Source:      v.spec.Name,
