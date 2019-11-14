@@ -9,15 +9,16 @@ import (
 )
 
 func spec(s *adagio.Node_Spec) SpecBuilder {
-	return SpecBuilderFunc(func() (*adagio.Node_Spec, error) {
+	return SpecBuilderFunc(func(name string) (*adagio.Node_Spec, error) {
+		s.Name = name
 		return s, nil
 	})
 }
 
-type SpecBuilderFunc func() (*adagio.Node_Spec, error)
+type SpecBuilderFunc func(string) (*adagio.Node_Spec, error)
 
-func (s SpecBuilderFunc) NewSpec() (*adagio.Node_Spec, error) {
-	return s()
+func (s SpecBuilderFunc) NewSpec(name string) (*adagio.Node_Spec, error) {
+	return s(name)
 }
 
 type client struct {

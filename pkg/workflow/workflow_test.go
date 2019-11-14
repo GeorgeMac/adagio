@@ -21,8 +21,8 @@ func Test_Builder_Simple(t *testing.T) {
 		}
 		dSpec = &adagio.Node_Spec{Name: "d"}
 
-		emptySpec = SpecBuilderFunc(func() (*adagio.Node_Spec, error) {
-			return &adagio.Node_Spec{}, nil
+		emptySpec = SpecBuilderFunc(func(name string) (*adagio.Node_Spec, error) {
+			return &adagio.Node_Spec{Name: name}, nil
 		})
 
 		expected = &adagio.Run{Id: "foo"}
@@ -47,10 +47,10 @@ func Test_Builder_Simple(t *testing.T) {
 	var (
 		builder = NewBuilder()
 
-		a = MustNode(builder.Node("a", emptySpec))
-		b = MustNode(builder.Node("b", emptySpec))
-		c = MustNode(builder.Node("c", emptySpec, WithRetry(adagio.OnFail, 2)))
-		d = MustNode(builder.Node("d", emptySpec))
+		a = builder.Node("a", emptySpec)
+		b = builder.Node("b", emptySpec)
+		c = builder.Node("c", emptySpec, WithRetry(adagio.OnFail, 2))
+		d = builder.Node("d", emptySpec)
 	)
 
 	c.DependsOn(a, b)

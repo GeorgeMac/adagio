@@ -7,7 +7,10 @@ import (
 	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
+	"github.com/georgemac/adagio/pkg/workflow"
 )
+
+var _ workflow.SpecBuilder = (*Builder)(nil)
 
 // FieldType is a type of field
 type FieldType uint8
@@ -60,8 +63,8 @@ func (p *Builder) fieldName(field *Field) string {
 
 // NewSpec constructs a Node_Spec based on the current state
 // of the builders fields
-func (p *Builder) NewSpec() (*adagio.Node_Spec, error) {
-	spec := &adagio.Node_Spec{Runtime: p.name}
+func (p *Builder) NewSpec(name string) (*adagio.Node_Spec, error) {
+	spec := &adagio.Node_Spec{Name: name, Runtime: p.name}
 	for _, field := range p.fields {
 		values, err := field.Values()
 		if err != nil {
