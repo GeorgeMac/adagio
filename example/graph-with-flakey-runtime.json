@@ -2,30 +2,33 @@
   "nodes":[
     {
       "name":    "a",
-      "runtime": "echo"
+      "runtime": "debug"
     },
     {
       "name":    "b",
-      "runtime": "echo"
+      "runtime": "debug"
     },
     {
       "name":    "c",
-      "runtime": "echo"
+      "runtime": "debug"
     },
     {
       "name":    "d",
-      "runtime": "flakey",
+      "runtime": "debug",
+      "metadata": {
+        "adagio.runtime.debug.chances": {"values": ["0.5 fail"]}
+      },
       "retry": {
         "fail": {"max_attempts": 3}
       }
     },
     {
       "name":    "e",
-      "runtime": "echo"
+      "runtime": "debug"
     },
     {
       "name":    "f",
-      "runtime": "echo"
+      "runtime": "debug"
     },
     {
       "name":    "g",

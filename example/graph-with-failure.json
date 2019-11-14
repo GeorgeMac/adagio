@@ -2,27 +2,30 @@
   "nodes":[
     {
       "name":    "a",
-      "runtime": "echo"
+      "runtime": "debug"
     },
     {
       "name":    "b",
-      "runtime": "echo"
+      "runtime": "debug"
     },
     {
       "name":    "c",
-      "runtime": "echo"
+      "runtime": "debug"
     },
     {
       "name":    "d",
-      "runtime": "fail"
+      "runtime": "debug",
+      "metadata": {
+        "adagio.runtime.debug.conclusion": {"values": ["fail"]}
+      }
     },
     {
       "name":    "e",
-      "runtime": "echo"
+      "runtime": "debug"
     },
     {
       "name":    "f",
-      "runtime": "echo"
+      "runtime": "debug"
     },
     {
       "name":    "g",

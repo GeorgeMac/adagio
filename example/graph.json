@@ -2,27 +2,27 @@
   "nodes":[
     {
       "name":    "a",
-      "runtime": "echo"
+      "runtime": "debug"
     },
     {
       "name":    "b",
-      "runtime": "echo"
+      "runtime": "debug"
     },
     {
       "name":    "c",
-      "runtime": "echo"
+      "runtime": "debug"
     },
     {
       "name":    "d",
-      "runtime": "echo"
+      "runtime": "debug"
     },
     {
       "name":    "e",
-      "runtime": "echo"
+      "runtime": "debug"
     },
     {
       "name":    "f",
-      "runtime": "echo"
+      "runtime": "debug"
     },
     {
       "name":    "g",
