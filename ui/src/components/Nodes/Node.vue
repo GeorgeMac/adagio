@@ -9,6 +9,7 @@
         hoverable
         custom-detail-row
         detail-key="property"
+        :opened-detailed="['retry']"
         :show-detail-icon="false">
 
         <template slot-scope="props">
@@ -43,6 +44,7 @@
       </b-table>
     </div>
   </div>
+  <div v-else>Please select a node to see further details...</div>
 </template>
 
 <script>
@@ -71,7 +73,7 @@ export default {
       var retry = this.node.spec.retry || {};
       retry = {
         'property': 'retry',
-        'value':    Object.entries(retry)
+        'value':    Object.keys(retry).length > 0 ? Object.entries(retry) : ''
       };
 
       return [
@@ -96,7 +98,7 @@ export default {
       this.$refs.table.toggleDetails(row)
     },
     isRetry(row) {
-      return row.property == 'retry';
+      return row.property == 'retry' && row.value.length > 0;
     },
     retryClass() {
       return this.isRetryExpanded ? 'rotate down' : 'rotate';
