@@ -29,8 +29,23 @@ type Repository interface {
 	UnsubscribeAll(*adagio.Agent, chan<- *adagio.Event) error
 }
 
-// Runtime is a type which can execute a node and produce a result
+// RuntimeMap is a set of runtimes identified by name
+type RuntimeMap map[string]Runtime
+
+// Register adds the runtime to the RuntimeMap
+func (m RuntimeMap) Register(r Runtime) {
+	m[r.Name()] = r
+}
+
+// Runtime is a type with a name which can generate
+// new runtime calls
 type Runtime interface {
+	Name() string
+	BlankCall() Call
+}
+
+// Call is a type which can parse and execute a node
+type Call interface {
 	Parse(*adagio.Node) error
 	Run() (*adagio.Result, error)
 }
@@ -51,7 +66,7 @@ func (fn ClaimerFunc) NewClaim() *adagio.Claim { return fn() }
 // process them
 type Pool struct {
 	repo     Repository
-	runtimes map[string]func() Runtime
+	runtimes RuntimeMap
 
 	size int
 
@@ -59,7 +74,7 @@ type Pool struct {
 }
 
 // NewPool constructs and configures a new node pool for execution
-func NewPool(repo Repository, runtimes map[string]func() Runtime, opts ...Option) *Pool {
+func NewPool(repo Repository, runtimes RuntimeMap, opts ...Option) *Pool {
 	pool := &Pool{
 		repo:     repo,
 		runtimes: runtimes,
@@ -158,11 +173,11 @@ func (p *Pool) handleEvent(claimer Claimer, event *adagio.Event) error {
 	case adagio.Event_NODE_READY:
 		var (
 			result *adagio.Result
-			runner = runtime()
+			call   = runtime.BlankCall()
 		)
 
-		if err = runner.Parse(node); err == nil {
-			if result, err = runner.Run(); err == nil {
+		if err = call.Parse(node); err == nil {
+			if result, err = call.Run(); err == nil {
 				nodeResult = &adagio.Node_Result{
 					Conclusion: adagio.Node_Result_Conclusion(result.Conclusion),
 					Metadata:   result.Metadata,

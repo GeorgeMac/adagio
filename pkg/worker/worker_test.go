@@ -23,24 +23,27 @@ func TestPool_HappyPath_NODE_READY(t *testing.T) {
 		parseCalls uint64
 		runCalls   uint64
 
-		runtimes = map[string]func() Runtime{
-			"test": func() Runtime {
-				return runtime{
-					parse: func(n *adagio.Node) error {
-						atomic.AddUint64(&parseCalls, 1)
+		runtimes = map[string]Runtime{
+			"test": runtime{
+				name: "test",
+				newCall: func() Call {
+					return call{
+						parse: func(n *adagio.Node) error {
+							atomic.AddUint64(&parseCalls, 1)
 
-						require.Equal(t, n, node)
+							require.Equal(t, n, node)
 
-						return nil
-					},
-					run: func() (*adagio.Result, error) {
-						atomic.AddUint64(&runCalls, 1)
+							return nil
+						},
+						run: func() (*adagio.Result, error) {
+							atomic.AddUint64(&runCalls, 1)
 
-						return &adagio.Result{
-							Conclusion: adagio.Result_SUCCESS,
-						}, nil
-					},
-				}
+							return &adagio.Result{
+								Conclusion: adagio.Result_SUCCESS,
+							}, nil
+						},
+					}
+				},
 			},
 		}
 
@@ -54,7 +57,7 @@ func TestPool_HappyPath_NODE_READY(t *testing.T) {
 			})
 		}
 
-		pool = NewPool(&repo, runtimes, WithWorkerCount(5), WithClaimerFunc(claimFunc))
+		pool = NewPool(&repo, RuntimeMap(runtimes), WithWorkerCount(5), WithClaimerFunc(claimFunc))
 
 		done         = make(chan struct{})
 		ctxt, cancel = context.WithCancel(context.Background())
@@ -119,24 +122,27 @@ func TestPool_Error_RuntimeDoesNotExist(t *testing.T) {
 		runCalls   uint64
 		parseCalls uint64
 
-		runtimes = map[string]func() Runtime{
-			"known": func() Runtime {
-				return runtime{
-					parse: func(n *adagio.Node) error {
-						atomic.AddUint64(&parseCalls, 1)
+		runtimes = map[string]Runtime{
+			"known": runtime{
+				name: "known",
+				newCall: func() Call {
+					return call{
+						parse: func(n *adagio.Node) error {
+							atomic.AddUint64(&parseCalls, 1)
 
-						require.Equal(t, n, node)
+							require.Equal(t, n, node)
 
-						return nil
-					},
-					run: func() (*adagio.Result, error) {
-						atomic.AddUint64(&runCalls, 1)
+							return nil
+						},
+						run: func() (*adagio.Result, error) {
+							atomic.AddUint64(&runCalls, 1)
 
-						return &adagio.Result{
-							Conclusion: adagio.Result_SUCCESS,
-						}, nil
-					},
-				}
+							return &adagio.Result{
+								Conclusion: adagio.Result_SUCCESS,
+							}, nil
+						},
+					}
+				},
 			},
 		}
 
@@ -210,22 +216,25 @@ func TestPool_Error_RuntimeError(t *testing.T) {
 		runCalls   uint64
 		parseCalls uint64
 
-		runtimes = map[string]func() Runtime{
-			"error": func() Runtime {
-				return runtime{
-					parse: func(n *adagio.Node) error {
-						atomic.AddUint64(&parseCalls, 1)
+		runtimes = map[string]Runtime{
+			"error": runtime{
+				name: "error",
+				newCall: func() Call {
+					return call{
+						parse: func(n *adagio.Node) error {
+							atomic.AddUint64(&parseCalls, 1)
 
-						require.Equal(t, n, node)
+							require.Equal(t, n, node)
 
-						return nil
-					},
-					run: func() (*adagio.Result, error) {
-						atomic.AddUint64(&runCalls, 1)
+							return nil
+						},
+						run: func() (*adagio.Result, error) {
+							atomic.AddUint64(&runCalls, 1)
 
-						return nil, errors.New("something went wrong")
-					},
-				}
+							return nil, errors.New("something went wrong")
+						},
+					}
+				},
 			},
 		}
 
@@ -303,24 +312,27 @@ func TestPool_Error_NODE_ORPHANED(t *testing.T) {
 		runCalls   uint64
 		parseCalls uint64
 
-		runtimes = map[string]func() Runtime{
-			"test": func() Runtime {
-				return runtime{
-					parse: func(n *adagio.Node) error {
-						atomic.AddUint64(&parseCalls, 1)
+		runtimes = map[string]Runtime{
+			"test": runtime{
+				name: "test",
+				newCall: func() Call {
+					return call{
+						parse: func(n *adagio.Node) error {
+							atomic.AddUint64(&parseCalls, 1)
 
-						require.Equal(t, n, node)
+							require.Equal(t, n, node)
 
-						return nil
-					},
-					run: func() (*adagio.Result, error) {
-						atomic.AddUint64(&runCalls, 1)
+							return nil
+						},
+						run: func() (*adagio.Result, error) {
+							atomic.AddUint64(&runCalls, 1)
 
-						return &adagio.Result{
-							Conclusion: adagio.Result_SUCCESS,
-						}, nil
-					},
-				}
+							return &adagio.Result{
+								Conclusion: adagio.Result_SUCCESS,
+							}, nil
+						},
+					}
+				},
 			},
 		}
 

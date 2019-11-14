@@ -13,10 +13,52 @@ import (
 	"github.com/georgemac/adagio/pkg/workflow"
 )
 
+const name = "debug"
+
 var (
-	_ worker.Runtime       = (*Call)(nil)
+	_ worker.Runtime       = (*Runtime)(nil)
+	_ worker.Call          = (*Call)(nil)
 	_ workflow.SpecBuilder = (*Call)(nil)
 )
+
+// Runtime is a type which can be registered on a RuntimeMap
+// and can create calls
+type Runtime struct{}
+
+// Name returns "debug" the name of this runtime
+func (r Runtime) Name() string { return name }
+
+// BlankCall constructs a default blank Call
+func (r Runtime) BlankCall() worker.Call {
+	return blankCall()
+}
+
+func blankCall() *Call {
+	c := &Call{Builder: runtime.NewBuilder(name)}
+
+	c.String("conclusion", false, "success")(&c.Conclusion)
+	c.Int64("sleep", false, 0)(&c.Sleep)
+	c.Strings("chances", false)(&c.Chances)
+
+	return c
+}
+
+// NewCall constructure and configures a new Call pointer
+// The call will result in the provided conclusion unless
+// one of zero or more chance conditions come true. In the
+// case a chance condition is true, the result within the
+// condition is made instead.
+//
+// e.g. With(Chance(0.5, Panic)) will result in the runtime
+// causing a panic 50% of the time
+func NewCall(conclusion adagio.Result_Conclusion, opts ...Option) *Call {
+	call := blankCall()
+	call.Conclusion = strings.ToLower(conclusion.String())
+
+	Options(opts).Apply(call)
+
+	return call
+}
 
 // Call is a structure which contains the arguments
 // for a debug package runtime call
@@ -83,33 +125,6 @@ func With(chances ...ChanceCondition) Option {
 			c.Chances = append(c.Chances, fmt.Sprintf("%.2f %s", chance.Probability, chance.Result))
 		}
 	}
-}
-
-// NewCall constructure and configures a new Call pointer
-// The call will result in the provided conclusion unless
-// one of zero or more chance conditions come true. In the
-// case a chance condition is true, the result within the
-// condition is made instead.
-//
-// e.g. With(Chance(0.5, Panic)) will result in the runtime
-// causing a panic 50% of the time
-func NewCall(conclusion adagio.Result_Conclusion, opts ...Option) *Call {
-	call := BlankCall()
-	call.Conclusion = strings.ToLower(conclusion.String())
-
-	Options(opts).Apply(call)
-
-	return call
-}
-
-func BlankCall() *Call {
-	c := &Call{Builder: runtime.NewBuilder("debug")}
-
-	c.String("conclusion", false, "success")(&c.Conclusion)
-	c.Int64("sleep", false, 0)(&c.Sleep)
-	c.Strings("chances", false)(&c.Chances)
-
-	return c
 }
 
 // Run invokes the desired debug operations.
