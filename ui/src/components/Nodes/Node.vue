@@ -12,7 +12,7 @@
         :show-detail-icon="false">
 
         <template slot-scope="props">
-          <b-table-column field="property" label="Property" width="200"> {{ props.row.property }} </b-table-column>
+          <b-table-column field="property" label="Property" width="250"> {{ props.row.property }} </b-table-column>
           <b-table-column field="value" label="Value">
             <template v-if="isRetry(props.row)">
               <a @click="toggle(props.row)">
@@ -27,7 +27,7 @@
 
         <template slot="detail" slot-scope="props">
           <tr class="" v-for="(result) in props.row.value" :key="result[0]">
-            <td class="has-text-danger">{{ result[0] }}</td>
+            <td class="has-text-danger">&nbsp;&nbsp;&nbsp;{{ result[0] }}</td>
             <td>up to {{ result[1].max_attempts }} time(s)</td>
           </tr>
         </template>
@@ -37,7 +37,7 @@
       <p class="subtitle">Node Execution</p>
       <b-table ref="attempts-table" :data="attempts">
         <template slot-scope="props">
-          <b-table-column field="conclusion" label="Conclusion">{{ props.row.conclusion.toLowerCase() }}</b-table-column>
+          <b-table-column field="conclusion" label="Conclusion" width="250">{{ props.row.conclusion.toLowerCase() }}</b-table-column>
           <b-table-column field="output" label="Output">{{ decode(props.row.output) }}</b-table-column>
         </template>
       </b-table>
@@ -85,6 +85,10 @@ export default {
   },
   methods: {
     attemptsReversed() {
+      if (this.node.attempts === undefined) {
+        return [];
+      }
+
       return this.node.attempts.slice().reverse()
     },
     toggle(row) {
