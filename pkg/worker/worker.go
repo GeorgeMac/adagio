@@ -44,6 +44,25 @@ type Runtime interface {
 	BlankCall() Call
 }
 
+// RuntimeFunc converts a name and an anonymous call generating function
+// into a Runtime
+func RuntimeFunc(name string, fn func() Call) NamedRuntimeFunc {
+	return NamedRuntimeFunc{name, fn}
+}
+
+// NamedRuntimeFunc implements Runtime and aids in simplifying
+// runtime generation
+type NamedRuntimeFunc struct {
+	name string
+	fn   func() Call
+}
+
+// Name returns the runtimes name
+func (n NamedRuntimeFunc) Name() string { return n.name }
+
+// BlankCall delegates to the anonymous function
+func (n NamedRuntimeFunc) BlankCall() Call { return n.fn() }
+
 // Call is a type which can parse and execute a node
 type Call interface {
 	Parse(*adagio.Node) error

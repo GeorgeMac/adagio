@@ -12,21 +12,13 @@ import (
 const name = "exec"
 
 var (
-	_ worker.Runtime       = (*Runtime)(nil)
 	_ worker.Call          = (*Call)(nil)
 	_ workflow.SpecBuilder = (*Call)(nil)
 )
 
-// Runtime is a type which can be registered as a worker.Runtime
-// It can create blank calls
-type Runtime struct{}
-
-// Name returns "exec" the runtime name
-func (r Runtime) Name() string { return name }
-
-// BlankCall constructs a blank Call
-func (r Runtime) BlankCall() worker.Call {
-	return blankCall()
+// Runtime returns the exec package worker.Runtime
+func Runtime() worker.Runtime {
+	return worker.RuntimeFunc(name, func() worker.Call { return blankCall() })
 }
 
 func blankCall() *Call {

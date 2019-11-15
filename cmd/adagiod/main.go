@@ -148,8 +148,8 @@ func api(ctxt context.Context, repo controlservice.Repository) {
 
 func agent(ctxt context.Context, repo worker.Repository) {
 	runtimes := worker.RuntimeMap{}
-	runtimes.Register(exec.Runtime{})
-	runtimes.Register(debug.Runtime{})
+	runtimes.Register(exec.Runtime())
+	runtimes.Register(debug.Runtime())
 
 	worker.NewPool(repo, runtimes, worker.WithWorkerCount(5)).Run(ctxt)
 }

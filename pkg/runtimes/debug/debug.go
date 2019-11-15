@@ -16,21 +16,13 @@ import (
 const name = "debug"
 
 var (
-	_ worker.Runtime       = (*Runtime)(nil)
 	_ worker.Call          = (*Call)(nil)
 	_ workflow.SpecBuilder = (*Call)(nil)
 )
 
-// Runtime is a type which can be registered on a RuntimeMap
-// and can create calls
-type Runtime struct{}
-
-// Name returns "debug" the name of this runtime
-func (r Runtime) Name() string { return name }
-
-// BlankCall constructs a default blank Call
-func (r Runtime) BlankCall() worker.Call {
-	return blankCall()
+// Runtime returns the debub packages runtime
+func Runtime() worker.Runtime {
+	return worker.RuntimeFunc(name, func() worker.Call { return blankCall() })
 }
 
 func blankCall() *Call {
