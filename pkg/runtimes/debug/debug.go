@@ -16,13 +16,14 @@ import (
 const name = "debug"
 
 var (
-	_ worker.Function   = (*Function)(nil)
 	_ workflow.Function = (*Function)(nil)
 )
 
 // Runtime returns the debub packages runtime
 func Runtime() worker.Runtime {
-	return worker.RuntimeFunc(name, func() worker.Function { return blankFunction() })
+	return worker.RuntimeFunc(name, func() worker.Function {
+		return runtime.Function(blankFunction())
+	})
 }
 
 func blankFunction() *Function {

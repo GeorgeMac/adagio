@@ -42,6 +42,35 @@ const (
 	TimeArgumentType
 )
 
+// ParseRunner is a type which has a separate function for parsing a node
+// and then invoking the desired behavior via Run
+type ParseRunner interface {
+	Parse(n *adagio.Node) error
+	Run() (*adagio.Result, error)
+}
+
+// FunctionAdaptor is the type used to covert a ParseRunner
+// into a worker.Function compatable type
+type FunctionAdaptor struct {
+	runner ParseRunner
+}
+
+// Run calls Parse on the provided node and then invokes
+// Run on the underlying ParseRunner
+func (p FunctionAdaptor) Run(n *adagio.Node) (*adagio.Result, error) {
+	if err := p.runner.Parse(n); err != nil {
+		return nil, err
+	}
+
+	return p.runner.Run()
+}
+
+// Function converts the provided ParseRunner into a worker.Function
+// using the FunctionAdaptor wrapper type
+func Function(runner ParseRunner) FunctionAdaptor {
+	return FunctionAdaptor{runner}
+}
+
 // Builder is a struct aids in both parsing and construction
 // of runtimes and runtime request types
 type Builder struct {
@@ -102,9 +131,9 @@ func (p *Builder) Parse(node *adagio.Node) error {
 	return nil
 }
 
-// String configures a StringArgument which when call with a string pointer
+// String configures a string argument which when call with a string pointer
 // will set the pointer on calls to builder.Parse() and read the value
-// at the end of the pointer on calls to builder.Spec()
+// at the end of the pointer on calls to builder.NewSpec()
 func (s *Builder) String(v *string, name string, required bool, defaultValue string) {
 	argument := newArgument(name, StringArgumentType, required, []string{defaultValue})
 	argument.asMetadata = func() ([]string, error) {
@@ -132,9 +161,9 @@ func (s *Builder) String(v *string, name string, required bool, defaultValue str
 	s.arguments[name] = argument
 }
 
-// Strings configures a StringsArgument which when call with a string slice pointer
+// Strings configures a string slice argument which when call with a string slice pointer
 // will set the pointer on calls to builder.Parse() and read the value
-// at the end of the pointer on calls to builder.Spec()
+// at the end of the pointer on calls to builder.NewSpec()
 func (s *Builder) Strings(v *[]string, name string, required bool, defaultValues ...string) {
 	argument := newArgument(name, StringsArgumentType, required, defaultValues)
 	argument.asMetadata = func() ([]string, error) {
@@ -188,9 +217,9 @@ func (s *Builder) Int64(v *int64, name string, required bool, defaultValue int64
 	s.arguments[name] = argument
 }
 
-// Time configures a TimeArgument which when call with a int64 pointer
+// Time configures a time argument which when call with a int64 pointer
 // will set the pointer on calls to builder.Parse() and read the value
-// at the end of the pointer on calls to builder.Spec()
+// at the end of the pointer on calls to builder.NewSpec()
 func (s *Builder) Time(v *time.Time, name string, required bool, defaultValue time.Time) {
 	argument := newArgument(name, TimeArgumentType, required, []string{defaultValue.Format(time.RFC3339Nano)})
 	argument.asMetadata = func() ([]string, error) {

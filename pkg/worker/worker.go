@@ -65,8 +65,7 @@ func (n NamedRuntimeFunc) NewFunction() Function { return n.fn() }
 
 // Function is a type which can parse and execute a node
 type Function interface {
-	Parse(*adagio.Node) error
-	Run() (*adagio.Result, error)
+	Run(*adagio.Node) (*adagio.Result, error)
 }
 
 // Claimer is used to generate claims
@@ -195,13 +194,11 @@ func (p *Pool) handleEvent(claimer Claimer, event *adagio.Event) error {
 			fn     = runtime.NewFunction()
 		)
 
-		if err = fn.Parse(node); err == nil {
-			if result, err = fn.Run(); err == nil {
-				nodeResult = &adagio.Node_Result{
-					Conclusion: adagio.Node_Result_Conclusion(result.Conclusion),
-					Metadata:   result.Metadata,
-					Output:     result.Output,
-				}
+		if result, err = fn.Run(node); err == nil {
+			nodeResult = &adagio.Node_Result{
+				Conclusion: adagio.Node_Result_Conclusion(result.Conclusion),
+				Metadata:   result.Metadata,
+				Output:     result.Output,
 			}
 		}
 

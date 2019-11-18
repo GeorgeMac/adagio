@@ -20,23 +20,17 @@ func TestPool_HappyPath_NODE_READY(t *testing.T) {
 			},
 		}
 
-		parseCalls uint64
-		runCalls   uint64
+		runCalls uint64
 
 		runtimes = map[string]Runtime{
 			"test": runtime{
 				name: "test",
 				newFunction: func() Function {
 					return function{
-						parse: func(n *adagio.Node) error {
-							atomic.AddUint64(&parseCalls, 1)
+						run: func(n *adagio.Node) (*adagio.Result, error) {
+							atomic.AddUint64(&runCalls, 1)
 
 							require.Equal(t, n, node)
-
-							return nil
-						},
-						run: func() (*adagio.Result, error) {
-							atomic.AddUint64(&runCalls, 1)
 
 							return &adagio.Result{
 								Conclusion: adagio.Result_SUCCESS,
@@ -106,7 +100,6 @@ func TestPool_HappyPath_NODE_READY(t *testing.T) {
 	}, claim}, repo.finishCalls[0])
 
 	// ensure runtime was invoked once
-	assert.Equal(t, uint64(1), parseCalls)
 	assert.Equal(t, uint64(1), runCalls)
 }
 
@@ -119,23 +112,17 @@ func TestPool_Error_RuntimeDoesNotExist(t *testing.T) {
 			},
 		}
 
-		runCalls   uint64
-		parseCalls uint64
+		runCalls uint64
 
 		runtimes = map[string]Runtime{
 			"known": runtime{
 				name: "known",
 				newFunction: func() Function {
 					return function{
-						parse: func(n *adagio.Node) error {
-							atomic.AddUint64(&parseCalls, 1)
+						run: func(n *adagio.Node) (*adagio.Result, error) {
+							atomic.AddUint64(&runCalls, 1)
 
 							require.Equal(t, n, node)
-
-							return nil
-						},
-						run: func() (*adagio.Result, error) {
-							atomic.AddUint64(&runCalls, 1)
 
 							return &adagio.Result{
 								Conclusion: adagio.Result_SUCCESS,
@@ -201,7 +188,6 @@ func TestPool_Error_RuntimeDoesNotExist(t *testing.T) {
 
 	// ensure runtime was never invoked
 	assert.Equal(t, uint64(0), runCalls)
-	assert.Equal(t, uint64(0), parseCalls)
 }
 
 func TestPool_Error_RuntimeError(t *testing.T) {
@@ -213,23 +199,17 @@ func TestPool_Error_RuntimeError(t *testing.T) {
 			},
 		}
 
-		runCalls   uint64
-		parseCalls uint64
+		runCalls uint64
 
 		runtimes = map[string]Runtime{
 			"error": runtime{
 				name: "error",
 				newFunction: func() Function {
 					return function{
-						parse: func(n *adagio.Node) error {
-							atomic.AddUint64(&parseCalls, 1)
+						run: func(n *adagio.Node) (*adagio.Result, error) {
+							atomic.AddUint64(&runCalls, 1)
 
 							require.Equal(t, n, node)
-
-							return nil
-						},
-						run: func() (*adagio.Result, error) {
-							atomic.AddUint64(&runCalls, 1)
 
 							return nil, errors.New("something went wrong")
 						},
@@ -297,7 +277,6 @@ func TestPool_Error_RuntimeError(t *testing.T) {
 
 	// ensure runtime was never invoked
 	assert.Equal(t, uint64(1), runCalls)
-	assert.Equal(t, uint64(1), parseCalls)
 }
 
 func TestPool_Error_NODE_ORPHANED(t *testing.T) {
@@ -309,23 +288,17 @@ func TestPool_Error_NODE_ORPHANED(t *testing.T) {
 			},
 		}
 
-		runCalls   uint64
-		parseCalls uint64
+		runCalls uint64
 
 		runtimes = map[string]Runtime{
 			"test": runtime{
 				name: "test",
 				newFunction: func() Function {
 					return function{
-						parse: func(n *adagio.Node) error {
-							atomic.AddUint64(&parseCalls, 1)
+						run: func(n *adagio.Node) (*adagio.Result, error) {
+							atomic.AddUint64(&runCalls, 1)
 
 							require.Equal(t, n, node)
-
-							return nil
-						},
-						run: func() (*adagio.Result, error) {
-							atomic.AddUint64(&runCalls, 1)
 
 							return &adagio.Result{
 								Conclusion: adagio.Result_SUCCESS,
@@ -395,5 +368,4 @@ func TestPool_Error_NODE_ORPHANED(t *testing.T) {
 
 	// ensure runtime was never invoked
 	assert.Equal(t, uint64(0), runCalls)
-	assert.Equal(t, uint64(0), parseCalls)
 }

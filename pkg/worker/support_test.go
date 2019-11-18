@@ -16,12 +16,10 @@ func (r runtime) Name() string { return r.name }
 func (r runtime) NewFunction() Function { return r.newFunction() }
 
 type function struct {
-	parse func(*adagio.Node) error
-	run   func() (*adagio.Result, error)
+	run func(*adagio.Node) (*adagio.Result, error)
 }
 
-func (c function) Parse(n *adagio.Node) error   { return c.parse(n) }
-func (c function) Run() (*adagio.Result, error) { return c.run() }
+func (c function) Run(n *adagio.Node) (*adagio.Result, error) { return c.run(n) }
 
 type repository struct {
 	mu sync.Mutex

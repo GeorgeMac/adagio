@@ -12,13 +12,14 @@ import (
 const name = "exec"
 
 var (
-	_ worker.Function   = (*Function)(nil)
 	_ workflow.Function = (*Function)(nil)
 )
 
 // Runtime returns the exec package worker.Runtime
 func Runtime() worker.Runtime {
-	return worker.RuntimeFunc(name, func() worker.Function { return blankFunction() })
+	return worker.RuntimeFunc(name, func() worker.Function {
+		return runtime.Function(blankFunction())
+	})
 }
 
 func blankFunction() *Function {
@@ -47,9 +48,8 @@ func NewFunction(command string, args ...string) *Function {
 	return fn
 }
 
-// Run parses the command and arguments from the provided Node and then
-// spawns a subprocess for the desired command and returns the combined
-// output writer as an adagio Result output
+// Run spawns a subprocess for the desired command and returns the combined
+// output writer as an adagio Result output slice of bytes
 func (fn *Function) Run() (*adagio.Result, error) {
 	data, err := exec.Command(fn.Command, fn.Args...).CombinedOutput()
 	if err != nil {
