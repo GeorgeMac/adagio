@@ -12,46 +12,46 @@ import (
 const name = "exec"
 
 var (
-	_ worker.Call          = (*Call)(nil)
-	_ workflow.SpecBuilder = (*Call)(nil)
+	_ worker.Function   = (*Function)(nil)
+	_ workflow.Function = (*Function)(nil)
 )
 
 // Runtime returns the exec package worker.Runtime
 func Runtime() worker.Runtime {
-	return worker.RuntimeFunc(name, func() worker.Call { return blankCall() })
+	return worker.RuntimeFunc(name, func() worker.Function { return blankFunction() })
 }
 
-func blankCall() *Call {
-	c := &Call{Builder: runtime.NewBuilder(name)}
+func blankFunction() *Function {
+	c := &Function{Builder: runtime.NewBuilder(name)}
 
-	c.String("command", true, "")(&c.Command)
-	c.Strings("args", false)(&c.Args)
+	c.String(&c.Command, "command", true, "")
+	c.Strings(&c.Args, "args", false)
 
 	return c
 }
 
-// Call is a struct which implements the worker.Runtime
-// It executes the work for a provided node on a call to Run
+// Function is a struct which implements the worker.Runtime
+// It executes the work for a provided node on a function to Run
 // and uses the os/exec package to invoke a subprocess
-type Call struct {
+type Function struct {
 	*runtime.Builder
 	Command string
 	Args    []string
 }
 
-// NewCall configures a new exec.Call pointer
-func NewCall(command string, args ...string) *Call {
-	call := blankCall()
-	call.Command = command
-	call.Args = args
-	return call
+// NewFunction configures a new exec.Function pointer
+func NewFunction(command string, args ...string) *Function {
+	fn := blankFunction()
+	fn.Command = command
+	fn.Args = args
+	return fn
 }
 
 // Run parses the command and arguments from the provided Node and then
 // spawns a subprocess for the desired command and returns the combined
 // output writer as an adagio Result output
-func (call *Call) Run() (*adagio.Result, error) {
-	data, err := exec.Command(call.Command, call.Args...).CombinedOutput()
+func (fn *Function) Run() (*adagio.Result, error) {
+	data, err := exec.Command(fn.Command, fn.Args...).CombinedOutput()
 	if err != nil {
 		return nil, err
 	}

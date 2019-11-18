@@ -26,8 +26,8 @@ func TestPool_HappyPath_NODE_READY(t *testing.T) {
 		runtimes = map[string]Runtime{
 			"test": runtime{
 				name: "test",
-				newCall: func() Call {
-					return call{
+				newFunction: func() Function {
+					return function{
 						parse: func(n *adagio.Node) error {
 							atomic.AddUint64(&parseCalls, 1)
 
@@ -125,8 +125,8 @@ func TestPool_Error_RuntimeDoesNotExist(t *testing.T) {
 		runtimes = map[string]Runtime{
 			"known": runtime{
 				name: "known",
-				newCall: func() Call {
-					return call{
+				newFunction: func() Function {
+					return function{
 						parse: func(n *adagio.Node) error {
 							atomic.AddUint64(&parseCalls, 1)
 
@@ -219,8 +219,8 @@ func TestPool_Error_RuntimeError(t *testing.T) {
 		runtimes = map[string]Runtime{
 			"error": runtime{
 				name: "error",
-				newCall: func() Call {
-					return call{
+				newFunction: func() Function {
+					return function{
 						parse: func(n *adagio.Node) error {
 							atomic.AddUint64(&parseCalls, 1)
 
@@ -315,8 +315,8 @@ func TestPool_Error_NODE_ORPHANED(t *testing.T) {
 		runtimes = map[string]Runtime{
 			"test": runtime{
 				name: "test",
-				newCall: func() Call {
-					return call{
+				newFunction: func() Function {
+					return function{
 						parse: func(n *adagio.Node) error {
 							atomic.AddUint64(&parseCalls, 1)
 

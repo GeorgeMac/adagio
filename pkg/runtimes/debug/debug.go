@@ -16,73 +16,73 @@ import (
 const name = "debug"
 
 var (
-	_ worker.Call          = (*Call)(nil)
-	_ workflow.SpecBuilder = (*Call)(nil)
+	_ worker.Function   = (*Function)(nil)
+	_ workflow.Function = (*Function)(nil)
 )
 
 // Runtime returns the debub packages runtime
 func Runtime() worker.Runtime {
-	return worker.RuntimeFunc(name, func() worker.Call { return blankCall() })
+	return worker.RuntimeFunc(name, func() worker.Function { return blankFunction() })
 }
 
-func blankCall() *Call {
-	c := &Call{Builder: runtime.NewBuilder(name)}
+func blankFunction() *Function {
+	c := &Function{Builder: runtime.NewBuilder(name)}
 
-	c.String("conclusion", false, "success")(&c.Conclusion)
-	c.Int64("sleep", false, 0)(&c.Sleep)
-	c.Strings("chances", false)(&c.Chances)
+	c.String(&c.Conclusion, "conclusion", false, "success")
+	c.Int64(&c.Sleep, "sleep", false, 0)
+	c.Strings(&c.Chances, "chances", false)
 
 	return c
 }
 
-// NewCall constructure and configures a new Call pointer
-// The call will result in the provided conclusion unless
+// NewFunction constructure and configures a new Function pointer
+// The function will result in the provided conclusion unless
 // one of zero or more chance conditions come true. In the
 // case a chance condition is true, the result within the
 // condition is made instead.
 //
 // e.g. With(Chance(0.5, Panic)) will result in the runtime
 // causing a panic 50% of the time
-func NewCall(conclusion adagio.Result_Conclusion, opts ...Option) *Call {
-	call := blankCall()
-	call.Conclusion = strings.ToLower(conclusion.String())
+func NewFunction(conclusion adagio.Result_Conclusion, opts ...Option) *Function {
+	function := blankFunction()
+	function.Conclusion = strings.ToLower(conclusion.String())
 
-	Options(opts).Apply(call)
+	Options(opts).Apply(function)
 
-	return call
+	return function
 }
 
-// Call is a structure which contains the arguments
-// for a debug package runtime call
-type Call struct {
+// Function is a structure which contains the arguments
+// for a debug package runtime function
+type Function struct {
 	*runtime.Builder
 	Conclusion string
 	Sleep      int64
 	Chances    []string
 }
 
-// Option is a function option for the Call type
-type Option func(*Call)
+// Option is a function option for the Function type
+type Option func(*Function)
 
 // Options is a slice of Option types
 type Options []Option
 
-// Apply calls each option in order on the provided Call
-func (o Options) Apply(c *Call) {
+// Apply functions each option in order on the provided Function
+func (o Options) Apply(c *Function) {
 	for _, opt := range o {
 		opt(c)
 	}
 }
 
-// WithSleep configures a sleep on the debug call
+// WithSleep configures a sleep on the debug function
 func WithSleep(dur time.Duration) Option {
-	return func(c *Call) {
+	return func(c *Function) {
 		c.Sleep = int64(dur)
 	}
 }
 
 // Result is a string type which reprents the
-// result of an operation ran by debug runtime call
+// result of an operation ran by debug runtime function
 type Result string
 
 const (
@@ -97,7 +97,7 @@ const (
 )
 
 // ChanceCondition is a structure which contains a
-// potential result for the debug call and a probability
+// potential result for the debug function and a probability
 // represented as a float64 in the range [0, 1)
 type ChanceCondition struct {
 	Result      Result
@@ -109,10 +109,10 @@ func Chance(prob float64, res Result) ChanceCondition {
 	return ChanceCondition{res, prob}
 }
 
-// With configures a set of ChanceConditions on a Call
+// With configures a set of ChanceConditions on a Function
 // when the option is invoked
 func With(chances ...ChanceCondition) Option {
-	return func(c *Call) {
+	return func(c *Function) {
 		for _, chance := range chances {
 			c.Chances = append(c.Chances, fmt.Sprintf("%.2f %s", chance.Probability, chance.Result))
 		}
@@ -124,10 +124,10 @@ func With(chances ...ChanceCondition) Option {
 // then loops over any provided chance conditions.
 // Given no chance condinition is met it returns the configured
 // adagio result conclusion
-func (call *Call) Run() (*adagio.Result, error) {
-	time.Sleep(time.Duration(call.Sleep))
+func (function *Function) Run() (*adagio.Result, error) {
+	time.Sleep(time.Duration(function.Sleep))
 
-	for _, c := range call.Chances {
+	for _, c := range function.Chances {
 		var chance ChanceCondition
 		if _, err := fmt.Sscanf(c, "%f %s", &chance.Probability, &chance.Result); err != nil {
 			return nil, err
@@ -148,7 +148,7 @@ func (call *Call) Run() (*adagio.Result, error) {
 		}
 	}
 
-	conclusion := strings.ToUpper(call.Conclusion)
+	conclusion := strings.ToUpper(function.Conclusion)
 	return &adagio.Result{
 		Conclusion: adagio.Result_Conclusion(adagio.Result_Conclusion_value[conclusion]),
 	}, nil

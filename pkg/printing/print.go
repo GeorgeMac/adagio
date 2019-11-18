@@ -25,6 +25,7 @@ type (
 		Attempts   []Result
 		StartedAt  time.Time
 		FinishedAt time.Time
+		Inputs     map[string]string
 	}
 
 	Run struct {
@@ -74,6 +75,11 @@ func PBRunToRun(pbrun *adagio.Run) (Run, error) {
 			metadata[k] = values
 		}
 
+		inputs := map[string]string{}
+		for k, v := range node.Inputs {
+			inputs[k] = string(v)
+		}
+
 		run.Nodes = append(run.Nodes, Node{
 			Name:       node.Spec.Name,
 			Runtime:    node.Spec.Runtime,
@@ -82,6 +88,7 @@ func PBRunToRun(pbrun *adagio.Run) (Run, error) {
 			Attempts:   attempts,
 			StartedAt:  startedAt,
 			FinishedAt: finishedAt,
+			Inputs:     inputs,
 		})
 	}
 

@@ -27,10 +27,10 @@ func Test_Builder_Spec(t *testing.T) {
 					timeField    = time.Date(2019, 1, 1, 10, 0, 0, 75, time.UTC)
 				)
 
-				builder.String("string_field", false, "")(&stringField)
-				builder.Strings("strings_field", false)(&stringsField)
-				builder.Int64("int64_field", false, 0)(&int64Field)
-				builder.Time("time_field", false, defaultTime)(&timeField)
+				builder.String(&stringField, "string_field", false, "")
+				builder.Strings(&stringsField, "strings_field", false)
+				builder.Int64(&int64Field, "int64_field", false, 0)
+				builder.Time(&timeField, "time_field", false, defaultTime)
 
 				return builder
 			},
@@ -38,17 +38,58 @@ func Test_Builder_Spec(t *testing.T) {
 				Name:    "happy path",
 				Runtime: "foo",
 				Metadata: map[string]*adagio.MetadataValue{
-					"adagio.runtime.foo.string_field": &adagio.MetadataValue{
+					"adagio.arguments.foo.string_field": &adagio.MetadataValue{
 						Values: []string{"a_string"},
 					},
-					"adagio.runtime.foo.strings_field": &adagio.MetadataValue{
+					"adagio.arguments.foo.strings_field": &adagio.MetadataValue{
 						Values: []string{"a", "b", "c"},
 					},
-					"adagio.runtime.foo.int64_field": &adagio.MetadataValue{
+					"adagio.arguments.foo.int64_field": &adagio.MetadataValue{
 						Values: []string{"12345"},
 					},
-					"adagio.runtime.foo.time_field": &adagio.MetadataValue{
+					"adagio.arguments.foo.time_field": &adagio.MetadataValue{
 						Values: []string{"2019-01-01T10:00:00.000000075Z"},
+					},
+				},
+			},
+		},
+		{
+			name: "happy path - set argument from input",
+			setup: func() *Builder {
+				var (
+					builder      = NewBuilder("foo")
+					stringField  = "a_string"
+					stringsField = []string{"a", "b", "c"}
+					int64Field   = int64(12345)
+					timeField    = time.Date(2019, 1, 1, 10, 0, 0, 75, time.UTC)
+				)
+
+				builder.String(&stringField, "string_field", false, "")
+				builder.Strings(&stringsField, "strings_field", false)
+				builder.Int64(&int64Field, "int64_field", false, 0)
+				builder.Time(&timeField, "time_field", false, defaultTime)
+
+				if err := builder.SetArgumentFromInput("int64_field", "other_func"); err != nil {
+					t.Fatal(err)
+				}
+
+				return builder
+			},
+			spec: &adagio.Node_Spec{
+				Name:    "happy path - set argument from input",
+				Runtime: "foo",
+				Metadata: map[string]*adagio.MetadataValue{
+					"adagio.arguments.foo.string_field": &adagio.MetadataValue{
+						Values: []string{"a_string"},
+					},
+					"adagio.arguments.foo.strings_field": &adagio.MetadataValue{
+						Values: []string{"a", "b", "c"},
+					},
+					"adagio.arguments.foo.time_field": &adagio.MetadataValue{
+						Values: []string{"2019-01-01T10:00:00.000000075Z"},
+					},
+					"adagio.inputs.foo.int64_field": &adagio.MetadataValue{
+						Values: []string{"other_func"},
 					},
 				},
 			},
@@ -68,26 +109,28 @@ func Test_Builder_Spec(t *testing.T) {
 func Test_Builder_Parse(t *testing.T) {
 	for _, testCase := range []struct {
 		name  string
-		spec  *adagio.Node_Spec
+		node  *adagio.Node
 		setup func() (*Builder, func(*testing.T))
 	}{
 		{
 			name: "happy path",
-			spec: &adagio.Node_Spec{
-				Name:    "a",
-				Runtime: "foo",
-				Metadata: map[string]*adagio.MetadataValue{
-					"adagio.runtime.foo.string_field": &adagio.MetadataValue{
-						Values: []string{"a_string"},
-					},
-					"adagio.runtime.foo.strings_field": &adagio.MetadataValue{
-						Values: []string{"a", "b", "c"},
-					},
-					"adagio.runtime.foo.int64_field": &adagio.MetadataValue{
-						Values: []string{"12345"},
-					},
-					"adagio.runtime.foo.time_field": &adagio.MetadataValue{
-						Values: []string{"2019-07-10T10:00:00.000000050Z"},
+			node: &adagio.Node{
+				Spec: &adagio.Node_Spec{
+					Name:    "a",
+					Runtime: "foo",
+					Metadata: map[string]*adagio.MetadataValue{
+						"adagio.arguments.foo.string_field": &adagio.MetadataValue{
+							Values: []string{"a_string"},
+						},
+						"adagio.arguments.foo.strings_field": &adagio.MetadataValue{
+							Values: []string{"a", "b", "c"},
+						},
+						"adagio.arguments.foo.int64_field": &adagio.MetadataValue{
+							Values: []string{"12345"},
+						},
+						"adagio.arguments.foo.time_field": &adagio.MetadataValue{
+							Values: []string{"2019-07-10T10:00:00.000000050Z"},
+						},
 					},
 				},
 			},
@@ -100,10 +143,10 @@ func Test_Builder_Parse(t *testing.T) {
 					timeField    time.Time
 				)
 
-				builder.String("string_field", false, "")(&stringField)
-				builder.Strings("strings_field", false)(&stringsField)
-				builder.Int64("int64_field", false, 0)(&int64Field)
-				builder.Time("time_field", false, defaultTime)(&timeField)
+				builder.String(&stringField, "string_field", false, "")
+				builder.Strings(&stringsField, "strings_field", false)
+				builder.Int64(&int64Field, "int64_field", false, 0)
+				builder.Time(&timeField, "time_field", false, defaultTime)
 
 				return builder, func(t *testing.T) {
 					assert.Equal(t, "a_string", stringField)
@@ -115,10 +158,12 @@ func Test_Builder_Parse(t *testing.T) {
 		},
 		{
 			name: "happy path - defaults",
-			spec: &adagio.Node_Spec{
-				Name:     "a",
-				Runtime:  "foo",
-				Metadata: map[string]*adagio.MetadataValue{},
+			node: &adagio.Node{
+				Spec: &adagio.Node_Spec{
+					Name:     "a",
+					Runtime:  "foo",
+					Metadata: map[string]*adagio.MetadataValue{},
+				},
 			},
 			setup: func() (*Builder, func(*testing.T)) {
 				var (
@@ -128,9 +173,9 @@ func Test_Builder_Parse(t *testing.T) {
 					int64Field   int64
 				)
 
-				builder.String("string_field", false, "other_string")(&stringField)
-				builder.Strings("strings_field", false, "c", "d", "e")(&stringsField)
-				builder.Int64("int64_field", false, 20)(&int64Field)
+				builder.String(&stringField, "string_field", false, "other_string")
+				builder.Strings(&stringsField, "strings_field", false, "c", "d", "e")
+				builder.Int64(&int64Field, "int64_field", false, 20)
 
 				return builder, func(t *testing.T) {
 					assert.Equal(t, "other_string", stringField)
@@ -139,11 +184,58 @@ func Test_Builder_Parse(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "happy path - from inputs",
+			node: &adagio.Node{
+				Spec: &adagio.Node_Spec{
+					Name:    "a",
+					Runtime: "foo",
+					Metadata: map[string]*adagio.MetadataValue{
+						"adagio.arguments.foo.string_field": &adagio.MetadataValue{
+							Values: []string{"a_string"},
+						},
+						"adagio.arguments.foo.strings_field": &adagio.MetadataValue{
+							Values: []string{"a", "b", "c"},
+						},
+						"adagio.arguments.foo.int64_field": &adagio.MetadataValue{
+							Values: []string{"12345"},
+						},
+						"adagio.inputs.foo.time_field": &adagio.MetadataValue{
+							Values: []string{"other_func"},
+						},
+					},
+				},
+				Inputs: map[string][]byte{
+					"other_func": []byte("2019-01-01T10:00:00.000000075Z"),
+				},
+			},
+			setup: func() (*Builder, func(*testing.T)) {
+				var (
+					builder      = NewBuilder("foo")
+					stringField  string
+					stringsField []string
+					int64Field   int64
+					timeField    time.Time
+				)
+
+				builder.String(&stringField, "string_field", false, "")
+				builder.Strings(&stringsField, "strings_field", false)
+				builder.Int64(&int64Field, "int64_field", false, 0)
+				builder.Time(&timeField, "time_field", false, defaultTime)
+
+				return builder, func(t *testing.T) {
+					assert.Equal(t, "a_string", stringField)
+					assert.Equal(t, []string{"a", "b", "c"}, stringsField)
+					assert.Equal(t, int64(12345), int64Field)
+					assert.Equal(t, time.Date(2019, 1, 1, 10, 0, 0, 75, time.UTC), timeField)
+				}
+			},
+		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			builder, assert := testCase.setup()
 
-			builder.Parse(&adagio.Node{Spec: testCase.spec})
+			builder.Parse(testCase.node)
 
 			assert(t)
 		})
