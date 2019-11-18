@@ -8,17 +8,31 @@ import (
 	"google.golang.org/grpc"
 )
 
-func spec(s *adagio.Node_Spec) SpecBuilder {
-	return SpecBuilderFunc(func(name string) (*adagio.Node_Spec, error) {
+func function(s *adagio.Node_Spec) Function {
+	return FunctionFunc(func(name string) (*adagio.Node_Spec, error) {
 		s.Name = name
 		return s, nil
 	})
 }
 
-type SpecBuilderFunc func(string) (*adagio.Node_Spec, error)
+type FunctionFunc func(string) (*adagio.Node_Spec, error)
 
-func (s SpecBuilderFunc) NewSpec(name string) (*adagio.Node_Spec, error) {
-	return s(name)
+func (fn FunctionFunc) NewSpec(name string) (*adagio.Node_Spec, error) {
+	return fn(name)
+}
+
+type mappable struct {
+	FunctionFunc
+	argument, input string
+}
+
+func Mappable(fn FunctionFunc) *mappable {
+	return &mappable{FunctionFunc: fn}
+}
+
+func (m *mappable) SetArgumentFromInput(argument, input string) error {
+	m.argument, m.input = argument, input
+	return nil
 }
 
 type client struct {

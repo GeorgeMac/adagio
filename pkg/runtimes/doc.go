@@ -1,11 +1,23 @@
 // The runtime package contains types which aid in the building of runtimes
-// and runtime calls which can be constructed and invoked by the worker types
+// and runtime calls which can be constructed and invoked by the worker types.
 //
-// The *Builder type aids in composing types which avoid having to do fiddly
-// parsing to and from metadata fields on adagio.Node types
+// The *Builder type aids in composing types which avoid having to do manual
+// parsing to and from metadata fields on adagio.Node types.
 //
-// The following is a contrived example of implementing the Runtime and Call types
-// used the *Builder helper type
+// The `runtime.Function()` is a handy function which takes a type with the behavior for
+// parsing an incoming node (`Parse(*adagio.Node) error`) and running the function once
+// parsed (`Run() (*adagio.Result, error)`) as separate calls and combines them in a worker.Function
+// compatible implementation.
+// This allows for a *runtime.Builder to be embedded into new Function definitions,
+// which can then take on the responsibility of the `Parse(node) error` call.
+// All you need to do is define and configure the named arguments of your function using
+// the helper methods on the builder and then a single `Run()` implementation which takes
+// care of invoking your functions behavior.
+// For example, `builder.String(&str, "foo", false, "bar")` will add an argument "foo" which
+// is not required and defaults to the value "bar".
+//
+// The following is a contrived example of implementing the Runtime and Function types
+// used the *Builder helper type.
 //
 // package thing
 //
@@ -17,12 +29,12 @@
 //
 // func (r Runtime) Name() string { return name }
 //
-// func (r Runtime) BlankCall() worker.Call {
-//     return blankCall()
+// func (r Runtime) BlankFunction() worker.Function {
+//     return runtime.Function(blankFunction())
 // }
 //
-// func blankCall() *Call {
-//     call := &Call{Builder: runtime.New(name)}
+// func blankFunction() *Function {
+//     call := &Function{Builder: runtime.New(name)}
 //
 //     call.String("string_arg", true, "default")(&call.StringArg)
 //     call.Strings("strings_arg", false, "many", "default")(&call.StringsArg)
@@ -30,21 +42,21 @@
 //     return call
 // }
 //
-// type Call struct {
+// type Function struct {
 //     *runtime.Builder
 //     StringArg  string
 //     StringsArg []string
 // }
 //
-// func NewCall(stringArg string, extraStringArgs ...string) *Call {
-//     call := blackCall()
+// func NewFunction(stringArg string, extraStringArgs ...string) *Function {
+//     call := blackFunction()
 //     call.StringArg = stringArg
 //     call.StringsArg = extraStringArgs
 //
 //     return call
 // }
 //
-// func (c *Call) Run() error {
+// func (c *Function) Run() error {
 //     // do the things with the arguments
 // }
 package runtime

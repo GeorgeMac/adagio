@@ -21,7 +21,7 @@ func Test_Builder_Simple(t *testing.T) {
 		}
 		dSpec = &adagio.Node_Spec{Name: "d"}
 
-		emptySpec = SpecBuilderFunc(func(name string) (*adagio.Node_Spec, error) {
+		emptySpec = FunctionFunc(func(name string) (*adagio.Node_Spec, error) {
 			return &adagio.Node_Spec{Name: name}, nil
 		})
 
@@ -50,15 +50,20 @@ func Test_Builder_Simple(t *testing.T) {
 		a = builder.Node("a", emptySpec)
 		b = builder.Node("b", emptySpec)
 		c = builder.Node("c", emptySpec, WithRetry(adagio.OnFail, 2))
-		d = builder.Node("d", emptySpec)
+
+		mapped = Mappable(emptySpec)
+		d      = builder.Node("d", mapped)
 	)
 
-	c.DependsOn(a, b)
-	d.DependsOn(c)
+	c.DependsOn(a)
+	c.DependsOn(b)
+	d.DependsOn(c, MapOutputTo("first_argument"))
 
 	run, err := builder.Start(context.Background(), client)
 
 	assert.Nil(t, err)
 	assert.Equal(t, expected, run)
 	assert.Equal(t, expectedGraphSpec, client.req.Spec)
+	assert.Equal(t, "c", mapped.input)
+	assert.Equal(t, "first_argument", mapped.argument)
 }

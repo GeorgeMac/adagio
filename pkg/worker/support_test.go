@@ -7,21 +7,19 @@ import (
 )
 
 type runtime struct {
-	name    string
-	newCall func() Call
+	name        string
+	newFunction func() Function
 }
 
 func (r runtime) Name() string { return r.name }
 
-func (r runtime) BlankCall() Call { return r.newCall() }
+func (r runtime) NewFunction() Function { return r.newFunction() }
 
-type call struct {
-	parse func(*adagio.Node) error
-	run   func() (*adagio.Result, error)
+type function struct {
+	run func(*adagio.Node) (*adagio.Result, error)
 }
 
-func (c call) Parse(n *adagio.Node) error   { return c.parse(n) }
-func (c call) Run() (*adagio.Result, error) { return c.run() }
+func (c function) Run(n *adagio.Node) (*adagio.Result, error) { return c.run(n) }
 
 type repository struct {
 	mu sync.Mutex

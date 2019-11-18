@@ -41,12 +41,12 @@ func (m RuntimeMap) Register(r Runtime) {
 // new runtime calls
 type Runtime interface {
 	Name() string
-	BlankCall() Call
+	NewFunction() Function
 }
 
 // RuntimeFunc converts a name and an anonymous call generating function
 // into a Runtime
-func RuntimeFunc(name string, fn func() Call) NamedRuntimeFunc {
+func RuntimeFunc(name string, fn func() Function) NamedRuntimeFunc {
 	return NamedRuntimeFunc{name, fn}
 }
 
@@ -54,19 +54,18 @@ func RuntimeFunc(name string, fn func() Call) NamedRuntimeFunc {
 // runtime generation
 type NamedRuntimeFunc struct {
 	name string
-	fn   func() Call
+	fn   func() Function
 }
 
 // Name returns the runtimes name
 func (n NamedRuntimeFunc) Name() string { return n.name }
 
-// BlankCall delegates to the anonymous function
-func (n NamedRuntimeFunc) BlankCall() Call { return n.fn() }
+// NewFunction delegates to the anonymous function
+func (n NamedRuntimeFunc) NewFunction() Function { return n.fn() }
 
-// Call is a type which can parse and execute a node
-type Call interface {
-	Parse(*adagio.Node) error
-	Run() (*adagio.Result, error)
+// Function is a type which can parse and execute a node
+type Function interface {
+	Run(*adagio.Node) (*adagio.Result, error)
 }
 
 // Claimer is used to generate claims
@@ -192,16 +191,14 @@ func (p *Pool) handleEvent(claimer Claimer, event *adagio.Event) error {
 	case adagio.Event_NODE_READY:
 		var (
 			result *adagio.Result
-			call   = runtime.BlankCall()
+			fn     = runtime.NewFunction()
 		)
 
-		if err = call.Parse(node); err == nil {
-			if result, err = call.Run(); err == nil {
-				nodeResult = &adagio.Node_Result{
-					Conclusion: adagio.Node_Result_Conclusion(result.Conclusion),
-					Metadata:   result.Metadata,
-					Output:     result.Output,
-				}
+		if result, err = fn.Run(node); err == nil {
+			nodeResult = &adagio.Node_Result{
+				Conclusion: adagio.Node_Result_Conclusion(result.Conclusion),
+				Metadata:   result.Metadata,
+				Output:     result.Output,
 			}
 		}
 
