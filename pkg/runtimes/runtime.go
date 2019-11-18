@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -26,6 +27,8 @@ func (t ArgumentType) String() string {
 		return "int64"
 	case TimeArgumentType:
 		return "time.Time"
+	case JSONArgumentType:
+		return "json.Marshaller"
 	default:
 		return "unknown"
 	}
@@ -40,6 +43,8 @@ const (
 	Int64ArgumentType
 	// TimeArgumentType represent a time.Time type argument
 	TimeArgumentType
+	// JSONArgumentType represents any value marshalled to and from using JSON
+	JSONArgumentType
 )
 
 // ParseRunner is a type which has a separate function for parsing a node
@@ -247,6 +252,41 @@ func (s *Builder) Time(v *time.Time, name string, required bool, defaultValue ti
 	s.arguments[name] = argument
 }
 
+// JSON configures an argument which should be called with a pointer to
+// any json marshallable type
+// It will set the pointer on calls to builder.Parse() by calling unmarshal
+// on the pointer and read the value at the end of the pointer and marshal
+// it on calls to builder.NewSpec()
+func (s *Builder) JSON(v interface{}, name string, required bool) {
+	argument := newArgument(name, JSONArgumentType, required, []string{"{}"})
+	argument.asMetadata = func() ([]string, error) {
+		if v == nil {
+			if required {
+				return nil, errors.New("argument is required")
+			}
+
+			return nil, nil
+		}
+
+		data, err := json.Marshal(v)
+		if err != nil {
+			return nil, err
+		}
+
+		return []string{string(data)}, nil
+	}
+
+	argument.parse = func(vs []string) (err error) {
+		if len(vs) < 1 {
+			return errors.New("no value set for key")
+		}
+
+		return json.Unmarshal([]byte(vs[0]), v)
+	}
+
+	s.arguments[name] = argument
+}
+
 // Argument is a structure which contains the properties
 // of a argument used to call a runtime
 type Argument struct {
@@ -255,7 +295,6 @@ type Argument struct {
 	Required bool
 	Defaults []string
 
-	target     interface{}
 	fromInput  string
 	parse      func([]string) error
 	asMetadata func() ([]string, error)

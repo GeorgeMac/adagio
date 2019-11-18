@@ -6,6 +6,7 @@ import (
 
 	"github.com/georgemac/adagio/pkg/adagio"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var defaultTime = time.Date(2019, 7, 10, 10, 0, 0, 50, time.UTC)
@@ -25,12 +26,17 @@ func Test_Builder_Spec(t *testing.T) {
 					stringsField = []string{"a", "b", "c"}
 					int64Field   = int64(12345)
 					timeField    = time.Date(2019, 1, 1, 10, 0, 0, 75, time.UTC)
+					jsonField    = struct {
+						A string
+						B int64
+					}{"foo", 1234}
 				)
 
 				builder.String(&stringField, "string_field", false, "")
 				builder.Strings(&stringsField, "strings_field", false)
 				builder.Int64(&int64Field, "int64_field", false, 0)
 				builder.Time(&timeField, "time_field", false, defaultTime)
+				builder.JSON(&jsonField, "json_encoded_field", false)
 
 				return builder
 			},
@@ -49,6 +55,9 @@ func Test_Builder_Spec(t *testing.T) {
 					},
 					"adagio.arguments.foo.time_field": &adagio.MetadataValue{
 						Values: []string{"2019-01-01T10:00:00.000000075Z"},
+					},
+					"adagio.arguments.foo.json_encoded_field": &adagio.MetadataValue{
+						Values: []string{`{"A":"foo","B":1234}`},
 					},
 				},
 			},
@@ -131,6 +140,9 @@ func Test_Builder_Parse(t *testing.T) {
 						"adagio.arguments.foo.time_field": &adagio.MetadataValue{
 							Values: []string{"2019-07-10T10:00:00.000000050Z"},
 						},
+						"adagio.arguments.foo.json_field": &adagio.MetadataValue{
+							Values: []string{`{"a":"bar","b":2345}`},
+						},
 					},
 				},
 			},
@@ -141,18 +153,27 @@ func Test_Builder_Parse(t *testing.T) {
 					stringsField []string
 					int64Field   int64
 					timeField    time.Time
+					jsonField    struct {
+						A string `json:"a"`
+						B int64  `json:"b"`
+					}
 				)
 
 				builder.String(&stringField, "string_field", false, "")
 				builder.Strings(&stringsField, "strings_field", false)
 				builder.Int64(&int64Field, "int64_field", false, 0)
 				builder.Time(&timeField, "time_field", false, defaultTime)
+				builder.JSON(&jsonField, "json_field", false)
 
 				return builder, func(t *testing.T) {
 					assert.Equal(t, "a_string", stringField)
 					assert.Equal(t, []string{"a", "b", "c"}, stringsField)
 					assert.Equal(t, int64(12345), int64Field)
 					assert.Equal(t, defaultTime, timeField)
+					assert.Equal(t, (struct {
+						A string `json:"a"`
+						B int64  `json:"b"`
+					}{"bar", 2345}), jsonField)
 				}
 			},
 		},
@@ -203,10 +224,14 @@ func Test_Builder_Parse(t *testing.T) {
 						"adagio.inputs.foo.time_field": &adagio.MetadataValue{
 							Values: []string{"other_func"},
 						},
+						"adagio.inputs.foo.json_field": &adagio.MetadataValue{
+							Values: []string{"other_json_func"},
+						},
 					},
 				},
 				Inputs: map[string][]byte{
-					"other_func": []byte("2019-01-01T10:00:00.000000075Z"),
+					"other_func":      []byte("2019-01-01T10:00:00.000000075Z"),
+					"other_json_func": []byte(`{"a":"foo","b":1234}`),
 				},
 			},
 			setup: func() (*Builder, func(*testing.T)) {
@@ -216,18 +241,27 @@ func Test_Builder_Parse(t *testing.T) {
 					stringsField []string
 					int64Field   int64
 					timeField    time.Time
+					jsonField    struct {
+						A string `json:"a"`
+						B int64  `json:"b"`
+					}
 				)
 
 				builder.String(&stringField, "string_field", false, "")
 				builder.Strings(&stringsField, "strings_field", false)
 				builder.Int64(&int64Field, "int64_field", false, 0)
 				builder.Time(&timeField, "time_field", false, defaultTime)
+				builder.JSON(&jsonField, "json_field", false)
 
 				return builder, func(t *testing.T) {
 					assert.Equal(t, "a_string", stringField)
 					assert.Equal(t, []string{"a", "b", "c"}, stringsField)
 					assert.Equal(t, int64(12345), int64Field)
 					assert.Equal(t, time.Date(2019, 1, 1, 10, 0, 0, 75, time.UTC), timeField)
+					assert.Equal(t, (struct {
+						A string `json:"a"`
+						B int64  `json:"b"`
+					}{"foo", 1234}), jsonField)
 				}
 			},
 		},
@@ -235,7 +269,7 @@ func Test_Builder_Parse(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			builder, assert := testCase.setup()
 
-			builder.Parse(testCase.node)
+			require.Nil(t, builder.Parse(testCase.node))
 
 			assert(t)
 		})
