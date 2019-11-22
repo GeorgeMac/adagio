@@ -45,7 +45,7 @@ services:
     depends_on:
       - gateway
   etcd:
-    image: gcr.io/etcd-development/etcd:v3.3
+    image: gcr.io/etcd-development/etcd:v3.4.3
     command:
       - /usr/local/bin/etcd
       - -name=etcd1
