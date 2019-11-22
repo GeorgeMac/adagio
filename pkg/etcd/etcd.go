@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -15,11 +16,19 @@ import (
 	"github.com/georgemac/adagio/pkg/service/controlplane"
 	"github.com/georgemac/adagio/pkg/worker"
 	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/clientv3/namespace"
 )
 
 var (
 	_ worker.Repository       = (*Repository)(nil)
 	_ controlplane.Repository = (*Repository)(nil)
+)
+
+const (
+	runsPrefix   = "runs/"
+	statesPrefix = "states/"
+	agentsPrefix = "agents/"
+	nodesPrefix  = "nodes/"
 )
 
 type Repository struct {
@@ -30,8 +39,9 @@ type Repository struct {
 	mu            sync.Mutex
 	subscriptions map[chan<- *adagio.Event]chan struct{}
 
-	ns  namespace
-	now func() time.Time
+	namespace string
+	list      string
+	now       func() time.Time
 
 	ttl     time.Duration
 	leases  map[string]func()
@@ -45,12 +55,19 @@ func New(kv clientv3.KV, watcher clientv3.Watcher, leaser clientv3.Lease, opts .
 		leaser:        leaser,
 		subscriptions: map[chan<- *adagio.Event]chan struct{}{},
 		now:           func() time.Time { return time.Now().UTC() },
-		ns:            namespace("v0/"),
+		namespace:     "v0",
+		list:          "default",
 		ttl:           10 * time.Second,
 		leases:        map[string]func(){},
 	}
 
 	Options(opts).Apply(r)
+
+	fullNS := path.Join(r.namespace, r.list) + "/"
+
+	r.kv = namespace.NewKV(r.kv, fullNS)
+	r.watcher = namespace.NewWatcher(r.watcher, fullNS)
+	r.leaser = namespace.NewLease(r.leaser, fullNS)
 
 	return r
 }
@@ -61,7 +78,7 @@ func (r *Repository) Stats() (*adagio.Stats, error) {
 	}
 
 	resp, err := r.kv.Get(context.Background(),
-		r.ns.runs(),
+		runsPrefix,
 		clientv3.WithPrefix(),
 		clientv3.WithCountOnly())
 	if err != nil {
@@ -72,7 +89,7 @@ func (r *Repository) Stats() (*adagio.Stats, error) {
 
 	for status := range adagio.Node_Status_name {
 		resp, err := r.kv.Get(context.Background(),
-			r.ns.nodesInStateKey(adagio.Node_Status(status)),
+			nodesInStateKey(adagio.Node_Status(status)),
 			clientv3.WithPrefix(),
 			clientv3.WithCountOnly(),
 			clientv3.WithRev(resp.Header.Revision))
@@ -107,7 +124,7 @@ func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err erro
 	}
 
 	var (
-		runKey = r.ns.runKey(run)
+		runKey = runKey(run)
 		cmps   = []clientv3.Cmp{
 			clientv3.Compare(clientv3.Version(runKey), "=", 0),
 		}
@@ -123,8 +140,8 @@ func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err erro
 		}
 
 		var (
-			key      = r.ns.nodeKey(run.Id, node.Spec.Name)
-			stateKey = r.ns.nodeInStateKey(run.Id, statusToString(node.Status), node.Spec.Name)
+			key      = nodeKey(run.Id, node.Spec.Name)
+			stateKey = nodeInStateKey(run.Id, statusToString(node.Status), node.Spec.Name)
 			put      = clientv3.OpPut(key, string(nodeData))
 			putState = clientv3.OpPut(stateKey, "")
 		)
@@ -153,7 +170,7 @@ func (r *Repository) InspectRun(id string) (*adagio.Run, error) {
 
 func (r *Repository) ListAgents() (agents []*adagio.Agent, err error) {
 	ctxt := context.Background()
-	resp, err := r.kv.Get(ctxt, r.ns.agents(), clientv3.WithPrefix())
+	resp, err := r.kv.Get(ctxt, agentsPrefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, err
 	}
@@ -172,14 +189,14 @@ func (r *Repository) ListAgents() (agents []*adagio.Agent, err error) {
 
 func (r *Repository) ListRuns() (runs []*adagio.Run, err error) {
 	ctxt := context.Background()
-	resp, err := r.kv.Get(ctxt, r.ns.runs(), clientv3.WithPrefix())
+	resp, err := r.kv.Get(ctxt, runsPrefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, err
 	}
 
 	for _, kv := range resp.Kvs {
-		// strip namespace from key
-		parts := strings.Split(r.ns.stripBytes(kv.Key), "/")
+		// strip list from key
+		parts := strings.Split(string(kv.Key), "/")
 
 		// ignore non-run keys
 		if len(parts) != 2 {
@@ -268,9 +285,9 @@ func (r *Repository) complete(ctxt context.Context, runID string, node *adagio.N
 
 func (r *Repository) transition(ctxt context.Context, runID string, node *adagio.Node, toStatus adagio.Node_Status, cmps []clientv3.Cmp, ops []clientv3.Op, putOpts ...clientv3.OpOption) ([]clientv3.Cmp, []clientv3.Op, error) {
 	var (
-		nodeKey = r.ns.nodeKey(runID, node.Spec.Name)
-		fromKey = r.ns.nodeInStateKey(runID, statusToString(node.Status), node.Spec.Name)
-		toKey   = r.ns.nodeInStateKey(runID, statusToString(toStatus), node.Spec.Name)
+		nodeKey = nodeKey(runID, node.Spec.Name)
+		fromKey = nodeInStateKey(runID, statusToString(node.Status), node.Spec.Name)
+		toKey   = nodeInStateKey(runID, statusToString(toStatus), node.Spec.Name)
 		from    = node.Status
 	)
 
@@ -333,7 +350,7 @@ func (r *Repository) nodeIsOrphaned(runID string, node *adagio.Node) []clientv3.
 }
 
 func (r *Repository) statusDoesNotExist(runID string, node *adagio.Node, status adagio.Node_Status) clientv3.Cmp {
-	statusKey := r.ns.nodeInStateKey(runID, statusToString(status), node.Spec.Name)
+	statusKey := nodeInStateKey(runID, statusToString(status), node.Spec.Name)
 	return clientv3.Compare(clientv3.Version(statusKey), "=", 0)
 }
 
@@ -490,7 +507,7 @@ func (r *Repository) handleSuccess(ctxt context.Context, run *adagio.Run, node *
 			}
 
 			// ensure node in state key is created
-			currentKey := r.ns.nodeInStateKey(run.Id, statusToString(in.Status), in.Spec.Name)
+			currentKey := nodeInStateKey(run.Id, statusToString(in.Status), in.Spec.Name)
 			cmps = append(cmps, clientv3.Compare(clientv3.Version(currentKey), ">", 0))
 		}
 
@@ -539,25 +556,25 @@ func (r *Repository) handleFailure(ctxt context.Context, run *adagio.Run, node *
 	return cmps, ops, nil
 }
 
-func (r *Repository) Subscribe(agent *adagio.Agent, events chan<- *adagio.Event, typ ...adagio.Event_Type) error {
+func (r *Repository) Subscribe(a *adagio.Agent, events chan<- *adagio.Event, typ ...adagio.Event_Type) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	// create agent record
 
 	// construct a lease for the agent
-	leaseID, err := r.lease(agent.Id)
+	leaseID, err := r.lease(a.Id)
 	if err != nil {
 		return err
 	}
 
 	// persist agent in keyspace
-	agentData, err := json.Marshal(agent)
+	agentData, err := json.Marshal(a)
 	if err != nil {
 		return err
 	}
 
-	if _, err := r.kv.Put(context.Background(), r.ns.agent(agent), string(agentData), clientv3.WithLease(leaseID)); err != nil {
+	if _, err := r.kv.Put(context.Background(), agent(a), string(agentData), clientv3.WithLease(leaseID)); err != nil {
 		return err
 	}
 
@@ -568,7 +585,7 @@ func (r *Repository) Subscribe(agent *adagio.Agent, events chan<- *adagio.Event,
 	r.subscriptions[events] = ch
 
 	go func() {
-		defer r.cancelLease(agent.Id)
+		defer r.cancelLease(a.Id)
 
 		var (
 			ctxt   = context.Background()
@@ -580,7 +597,7 @@ func (r *Repository) Subscribe(agent *adagio.Agent, events chan<- *adagio.Event,
 		)
 
 		// consume existing ready nodes
-		resp, err := r.kv.Get(ctxt, r.ns.nodesInStateKey(adagio.Node_READY), clientv3.WithPrefix())
+		resp, err := r.kv.Get(ctxt, nodesInStateKey(adagio.Node_READY), clientv3.WithPrefix())
 		if err != nil {
 			log.Println(err)
 			goto Watch
@@ -597,7 +614,7 @@ func (r *Repository) Subscribe(agent *adagio.Agent, events chan<- *adagio.Event,
 
 	Watch:
 		// watch for new events
-		watch := r.watcher.Watch(ctxt, r.ns.states(), opts...)
+		watch := r.watcher.Watch(ctxt, statesPrefix, opts...)
 		for {
 			var resp clientv3.WatchResponse
 			select {
@@ -655,7 +672,7 @@ type filter struct {
 }
 
 func (r *Repository) handleKeyEvent(ctxt context.Context, dest chan<- *adagio.Event, ev keyEvent, filter filter, opts ...clientv3.OpOption) {
-	keyParts := strings.Split(r.ns.stripBytes(ev.Key), "/")
+	keyParts := strings.Split(string(ev.Key), "/")
 	if len(keyParts) < 6 {
 		return
 	}
@@ -709,7 +726,7 @@ func (r *Repository) handleKeyEvent(ctxt context.Context, dest chan<- *adagio.Ev
 func (r *Repository) getRun(ctxt context.Context, id string, ops ...clientv3.OpOption) (*adagio.Run, error) {
 	run := &adagio.Run{Id: id}
 
-	resp, err := r.kv.Get(ctxt, r.ns.runKey(run), ops...)
+	resp, err := r.kv.Get(ctxt, runKey(run), ops...)
 	if err != nil {
 		return nil, err
 	}
@@ -755,7 +772,7 @@ func (r *Repository) nodesForRun(ctxt context.Context, run *adagio.Run, ops ...c
 	ops = append(ops, clientv3.WithPrefix())
 
 	var (
-		prefix    = r.ns.allNodesKey(run)
+		prefix    = allNodesKey(run)
 		nodes     = map[string]*adagio.Node{}
 		resp, err = r.kv.Get(ctxt, prefix, ops...)
 	)
@@ -784,7 +801,7 @@ func (r *Repository) nodesForRun(ctxt context.Context, run *adagio.Run, ops ...c
 		}
 
 		// check status key exists at store revision for each node
-		resp, err := r.kv.Get(ctxt, r.ns.nodeInStateKey(run.Id, statusToString(node.Status), node.Spec.Name), ops...)
+		resp, err := r.kv.Get(ctxt, nodeInStateKey(run.Id, statusToString(node.Status), node.Spec.Name), ops...)
 		if err != nil {
 			return err
 		}
@@ -836,18 +853,18 @@ func (r *Repository) setInputs(ctxt context.Context, run *adagio.Run, node *adag
 	return nil
 }
 
-func (r *Repository) UnsubscribeAll(agent *adagio.Agent, ch chan<- *adagio.Event) error {
+func (r *Repository) UnsubscribeAll(a *adagio.Agent, ch chan<- *adagio.Event) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	// delete agent key before the
-	_, err := r.kv.Delete(context.Background(), r.ns.agent(agent))
+	_, err := r.kv.Delete(context.Background(), agent(a))
 	if err != nil {
 		return err
 	}
 
 	// release agent key lease when possible
-	r.cancelLease(agent.Id)
+	r.cancelLease(a.Id)
 
 	if signal, ok := r.subscriptions[ch]; ok {
 		signal <- struct{}{}
@@ -858,46 +875,28 @@ func (r *Repository) UnsubscribeAll(agent *adagio.Agent, ch chan<- *adagio.Event
 	return nil
 }
 
-type namespace string
-
-func (n namespace) runs() string {
-	return string(n) + "runs/"
+func agent(agent *adagio.Agent) string {
+	return agentsPrefix + agent.Id
 }
 
-func (n namespace) states() string {
-	return string(n) + "states/"
+func runKey(run *adagio.Run) string {
+	return runsPrefix + run.Id
 }
 
-func (n namespace) agents() string {
-	return string(n) + "agents/"
+func allNodesKey(run *adagio.Run) string {
+	return fmt.Sprintf("%s%s/node/", nodesPrefix, run.Id)
 }
 
-func (n namespace) agent(agent *adagio.Agent) string {
-	return fmt.Sprintf("%sagents/%s", n, agent.Id)
+func nodeKey(runID, name string) string {
+	return fmt.Sprintf("%s%s/node/%s", nodesPrefix, runID, name)
 }
 
-func (n namespace) runKey(run *adagio.Run) string {
-	return fmt.Sprintf("%sruns/%s", n, run.Id)
+func nodesInStateKey(status adagio.Node_Status) string {
+	return statesPrefix + statusToString(status)
 }
 
-func (n namespace) allNodesKey(run *adagio.Run) string {
-	return fmt.Sprintf("%snodes/%s/node/", n, run.Id)
-}
-
-func (n namespace) nodeKey(runID, name string) string {
-	return fmt.Sprintf("%snodes/%s/node/%s", n, runID, name)
-}
-
-func (n namespace) nodesInStateKey(status adagio.Node_Status) string {
-	return fmt.Sprintf("%sstates/%s", n, statusToString(status))
-}
-
-func (n namespace) nodeInStateKey(runID, state, name string) string {
-	return fmt.Sprintf("%sstates/%s/run/%s/node/%s", n, state, runID, name)
-}
-
-func (n namespace) stripBytes(key []byte) string {
-	return strings.TrimPrefix(string(key), string(n))
+func nodeInStateKey(runID, state, name string) string {
+	return fmt.Sprintf("%s%s/run/%s/node/%s", statesPrefix, state, runID, name)
 }
 
 type run struct {
