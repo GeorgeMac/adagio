@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"math"
 	"sort"
 	"sync"
 	"time"
@@ -157,7 +158,7 @@ func (r *Repository) ListAgents() (agents []*adagio.Agent, err error) {
 	return
 }
 
-func (r *Repository) ListRuns() (runs []*adagio.Run, err error) {
+func (r *Repository) ListRuns(req controlplane.ListRequest) (runs []*adagio.Run, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -168,6 +169,57 @@ func (r *Repository) ListRuns() (runs []*adagio.Run, err error) {
 	sort.Slice(runs, func(i, j int) bool {
 		return runs[i].Id < runs[j].Id
 	})
+
+	if req.From != nil || req.Until != nil {
+		var (
+			min            int
+			max            = len(runs)
+			minSet, maxSet bool
+			from, _        = time.Parse(time.RFC3339, runs[min].CreatedAt)
+		)
+
+		until, terr := time.Parse(time.RFC3339, runs[max-1].CreatedAt)
+		if terr != nil {
+			until = time.Unix(0, math.MaxInt64)
+		}
+
+		if req.From != nil {
+			from = *req.From
+		}
+
+		if req.Until != nil {
+			until = *req.Until
+		}
+
+		if until.Before(from) {
+			// if the end is before the beginning return the empty set
+			runs = nil
+			return
+		}
+
+		for i, run := range runs {
+			createdAt, err := time.Parse(time.RFC3339Nano, run.CreatedAt)
+			if err != nil {
+				continue
+			}
+
+			if !minSet && !createdAt.Before(from) {
+				minSet = true
+				min = i
+			}
+
+			if !maxSet && !createdAt.Before(until) {
+				maxSet = true
+				max = i + 1
+			}
+		}
+
+		runs = runs[min:max]
+	}
+
+	if limit := req.Limit; limit != nil {
+		runs = runs[:int(*limit)]
+	}
 
 	return
 }
@@ -197,7 +249,7 @@ func (r *Repository) ClaimNode(runID, name string, claim *adagio.Claim) (*adagio
 
 	// update node state to running
 	node.Status = adagio.Node_RUNNING
-	node.StartedAt = r.now().Format(time.RFC3339)
+	node.StartedAt = r.now().Format(time.RFC3339Nano)
 	node.Claim = claim
 
 	r.claims[claim.Id] = struct {
@@ -233,7 +285,7 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result, 
 	}
 
 	node.Status = adagio.Node_COMPLETED
-	node.FinishedAt = r.now().Format(time.RFC3339)
+	node.FinishedAt = r.now().Format(time.RFC3339Nano)
 	node.Attempts = append(node.Attempts, result)
 
 	outgoing, err := state.graph.Outgoing(node)
@@ -305,8 +357,8 @@ func (r *Repository) handleFailure(state runState, node *adagio.Node, src map[gr
 		out := outi.(*adagio.Node)
 
 		out.Status = adagio.Node_COMPLETED
-		out.StartedAt = r.now().Format(time.RFC3339)
-		out.FinishedAt = r.now().Format(time.RFC3339)
+		out.StartedAt = r.now().Format(time.RFC3339Nano)
+		out.FinishedAt = r.now().Format(time.RFC3339Nano)
 
 		outgoing, err := state.graph.Outgoing(out)
 		if err != nil {

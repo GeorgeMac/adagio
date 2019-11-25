@@ -15,6 +15,7 @@ import (
 	"github.com/georgemac/adagio/pkg/graph"
 	"github.com/georgemac/adagio/pkg/service/controlplane"
 	"github.com/georgemac/adagio/pkg/worker"
+	"github.com/oklog/ulid"
 	"go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/clientv3/namespace"
 )
@@ -22,6 +23,9 @@ import (
 var (
 	_ worker.Repository       = (*Repository)(nil)
 	_ controlplane.Repository = (*Repository)(nil)
+
+	minULID = ulid.MustNew(0, zeroReader{})
+	maxULID = ulid.MustNew(ulid.MaxTime(), oneReader{})
 )
 
 const (
@@ -187,9 +191,44 @@ func (r *Repository) ListAgents() (agents []*adagio.Agent, err error) {
 	return
 }
 
-func (r *Repository) ListRuns() (runs []*adagio.Run, err error) {
+func (r *Repository) ListRuns(req controlplane.ListRequest) (runs []*adagio.Run, err error) {
+	var (
+		opts = []clientv3.OpOption{clientv3.WithPrefix()}
+		key  = runsPrefix
+	)
+
+	if req.From != nil || req.Until != nil {
+		var (
+			from  = minULID
+			until = maxULID
+		)
+
+		if req.From != nil {
+			from, err = ulid.New(ulid.Timestamp(*req.From), zeroReader{})
+			if err != nil {
+				return
+			}
+		}
+
+		if req.Until != nil {
+			until, err = ulid.New(ulid.Timestamp(*req.Until), oneReader{})
+			if err != nil {
+				return
+			}
+		}
+
+		key = runsPrefix + from.String()
+		opts = []clientv3.OpOption{clientv3.WithRange(runsPrefix + until.String())}
+	}
+
+	if req.Limit != nil {
+		opts = append(opts, clientv3.WithLimit(int64(*req.Limit)))
+	}
+
 	ctxt := context.Background()
-	resp, err := r.kv.Get(ctxt, runsPrefix, clientv3.WithPrefix())
+	resp, err := r.kv.Get(ctxt,
+		key,
+		opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -295,15 +334,15 @@ func (r *Repository) transition(ctxt context.Context, runID string, node *adagio
 
 	switch toStatus {
 	case adagio.Node_RUNNING:
-		node.StartedAt = r.now().Format(time.RFC3339)
+		node.StartedAt = r.now().Format(time.RFC3339Nano)
 
 	case adagio.Node_COMPLETED:
 		now := r.now()
 		if node.StartedAt == "" {
-			node.StartedAt = now.Format(time.RFC3339)
+			node.StartedAt = now.Format(time.RFC3339Nano)
 		}
 
-		node.FinishedAt = now.Format(time.RFC3339)
+		node.FinishedAt = now.Format(time.RFC3339Nano)
 	}
 
 	data, err := json.Marshal(node)
@@ -911,7 +950,7 @@ func unmarshalRun(data []byte, dst *adagio.Run) error {
 		return nil
 	}
 
-	dst.CreatedAt = run.CreatedAt.Format(time.RFC3339)
+	dst.CreatedAt = run.CreatedAt.Format(time.RFC3339Nano)
 	dst.Edges = run.Edges
 
 	// create an initial specification with zeroed node state
@@ -925,7 +964,7 @@ func unmarshalRun(data []byte, dst *adagio.Run) error {
 
 func marshalRun(createdAt string, spec []*adagio.Node_Spec, edges []*adagio.Edge) ([]byte, error) {
 	var (
-		createdAtT, err = time.Parse(time.RFC3339, createdAt)
+		createdAtT, err = time.Parse(time.RFC3339Nano, createdAt)
 		run             = run{createdAtT, spec, edges}
 	)
 	if err != nil {
@@ -953,4 +992,22 @@ func (t types) contains(typ adagio.Event_Type) bool {
 	}
 
 	return false
+}
+
+type zeroReader struct{}
+
+func (zeroReader) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = 0
+	}
+	return len(p), nil
+}
+
+type oneReader struct{}
+
+func (oneReader) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = 255
+	}
+	return len(p), nil
 }
