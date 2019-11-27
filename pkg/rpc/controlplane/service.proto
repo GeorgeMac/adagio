@@ -63,9 +63,9 @@ message InspectResponse {
 }
 
 message ListRequest {
-  int64  from_ns  = 1;
-  int64  until_ns = 2;
-  uint64 limit    = 3;
+  int64  start_ns  = 1;
+  int64  finish_ns = 2;
+  uint64 limit     = 3;
 }
 
 message ListRunsResponse {

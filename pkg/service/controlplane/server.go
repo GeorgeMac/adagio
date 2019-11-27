@@ -20,9 +20,9 @@ type Repository interface {
 }
 
 type ListRequest struct {
-	From  *time.Time
-	Until *time.Time
-	Limit *uint64
+	Start  *time.Time
+	Finish *time.Time
+	Limit  *uint64
 }
 
 type Service struct {
@@ -69,14 +69,14 @@ func (s *Service) ListRuns(_ context.Context, r *controlplane.ListRequest) (*con
 		Limit: &r.Limit,
 	}
 
-	if r.FromNs > 0 {
-		from := time.Unix(0, r.FromNs)
-		req.From = &from
+	if r.StartNs > 0 {
+		from := time.Unix(0, r.StartNs)
+		req.Start = &from
 	}
 
-	if r.UntilNs > 0 {
-		until := time.Unix(0, r.UntilNs)
-		req.Until = &until
+	if r.FinishNs > 0 {
+		until := time.Unix(0, r.FinishNs)
+		req.Finish = &until
 	}
 
 	runs, err := s.repo.ListRuns(req)

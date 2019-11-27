@@ -167,32 +167,32 @@ func (r *Repository) ListRuns(req controlplane.ListRequest) (runs []*adagio.Run,
 	}
 
 	sort.Slice(runs, func(i, j int) bool {
-		return runs[i].Id < runs[j].Id
+		return runs[i].Id > runs[j].Id
 	})
 
-	if req.From != nil || req.Until != nil {
+	if req.Start != nil || req.Finish != nil {
 		var (
 			min            int
 			max            = len(runs)
 			minSet, maxSet bool
-			from, _        = time.Parse(time.RFC3339, runs[min].CreatedAt)
+			start, _       = time.Parse(time.RFC3339, runs[min].CreatedAt)
 		)
 
-		until, terr := time.Parse(time.RFC3339, runs[max-1].CreatedAt)
+		finish, terr := time.Parse(time.RFC3339, runs[max-1].CreatedAt)
 		if terr != nil {
-			until = time.Unix(0, math.MaxInt64)
+			finish = time.Unix(0, math.MaxInt64)
 		}
 
-		if req.From != nil {
-			from = *req.From
+		if req.Start != nil {
+			start = *req.Start
 		}
 
-		if req.Until != nil {
-			until = *req.Until
+		if req.Finish != nil {
+			finish = *req.Finish
 		}
 
-		if until.Before(from) {
-			// if the end is before the beginning return the empty set
+		if start.Before(finish) {
+			// start must be > finish as time descending
 			runs = nil
 			return
 		}
@@ -203,12 +203,12 @@ func (r *Repository) ListRuns(req controlplane.ListRequest) (runs []*adagio.Run,
 				continue
 			}
 
-			if !minSet && !createdAt.Before(from) {
+			if !minSet && (createdAt.Before(start) || createdAt == start) {
 				minSet = true
 				min = i
 			}
 
-			if !maxSet && !createdAt.Before(until) {
+			if !maxSet && (createdAt.Before(finish) || createdAt == finish) {
 				maxSet = true
 				max = i + 1
 			}

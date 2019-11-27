@@ -197,28 +197,28 @@ func (r *Repository) ListRuns(req controlplane.ListRequest) (runs []*adagio.Run,
 		key  = runsPrefix
 	)
 
-	if req.From != nil || req.Until != nil {
+	if req.Start != nil || req.Finish != nil {
 		var (
-			from  = minULID
-			until = maxULID
+			start  = maxULID
+			finish = minULID
 		)
 
-		if req.From != nil {
-			from, err = ulid.New(ulid.Timestamp(*req.From), zeroReader{})
+		if req.Start != nil {
+			start, err = ulid.New(ulid.Timestamp(*req.Start), oneReader{})
 			if err != nil {
 				return
 			}
 		}
 
-		if req.Until != nil {
-			until, err = ulid.New(ulid.Timestamp(*req.Until), oneReader{})
+		if req.Finish != nil {
+			finish, err = ulid.New(ulid.Timestamp(*req.Finish), zeroReader{})
 			if err != nil {
 				return
 			}
 		}
 
-		key = runsPrefix + from.String()
-		opts = []clientv3.OpOption{clientv3.WithRange(runsPrefix + until.String())}
+		key = runsPrefix + finish.String()
+		opts = []clientv3.OpOption{clientv3.WithRange(runsPrefix + start.String())}
 	}
 
 	if req.Limit != nil {
@@ -228,13 +228,13 @@ func (r *Repository) ListRuns(req controlplane.ListRequest) (runs []*adagio.Run,
 	ctxt := context.Background()
 	resp, err := r.kv.Get(ctxt,
 		key,
-		opts...)
+		append(opts, clientv3.WithSort(clientv3.SortByKey, clientv3.SortDescend))...)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, kv := range resp.Kvs {
-		// strip list from key
+		// strip list start key
 		parts := strings.Split(string(kv.Key), "/")
 
 		// ignore non-run keys

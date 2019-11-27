@@ -337,7 +337,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 
 			// the run is listed
 			assert.Len(t, runs, 2)
-			assert.Equal(t, run.Id, runs[1].Id)
+			assert.Equal(t, run.Id, runs[0].Id)
 
 			assert.Equal(t, []*adagio.Node{
 				completed(a, nil, success("a")),
@@ -358,7 +358,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				completed(g, map[string][]byte{
 					"f": []byte("f"),
 				}),
-			}, stripClaims(runs[1].Nodes))
+			}, stripClaims(runs[0].Nodes))
 		})
 	})
 
@@ -496,7 +496,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 
 			// the run is listed
 			assert.Len(t, runs, 3)
-			assert.Equal(t, run.Id, runs[2].Id)
+			assert.Equal(t, run.Id, runs[0].Id)
 
 			assert.Equal(t, []*adagio.Node{
 				completed(a, nil, success("a")),
@@ -508,7 +508,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				completed(h, map[string][]byte{
 					"a": []byte("a"),
 				}, errorResult("h"), success("h")),
-			}, stripClaims(runs[2].Nodes))
+			}, stripClaims(runs[0].Nodes))
 		})
 	})
 
@@ -621,7 +621,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 
 			// the run is listed
 			assert.Len(t, runs, 4)
-			assert.Equal(t, run.Id, runs[3].Id)
+			assert.Equal(t, run.Id, runs[0].Id)
 
 			assert.Equal(t, []*adagio.Node{
 				completed(a, nil, success("a")),
@@ -632,7 +632,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				completed(i, map[string][]byte{
 					"a": []byte("a"),
 				}, fail("i"), fail("i")),
-			}, stripClaims(runs[3].Nodes))
+			}, stripClaims(runs[0].Nodes))
 		})
 	})
 
@@ -699,11 +699,11 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 
 			// the run is listed
 			assert.Len(t, runs, 5)
-			assert.Equal(t, run.Id, runs[4].Id)
+			assert.Equal(t, run.Id, runs[0].Id)
 
 			assert.Equal(t, []*adagio.Node{
 				completed(a, nil, errorResult("a")),
-			}, stripClaims(runs[4].Nodes))
+			}, stripClaims(runs[0].Nodes))
 		})
 	})
 
@@ -744,30 +744,30 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 			{
 				name: "from 2nd run",
 				req: controlplane.ListRequest{
-					From: &secondRunCreatedAt,
+					Start: &secondRunCreatedAt,
 				},
 				runs: allRuns[1:],
 			},
 			{
 				name: "from last run",
 				req: controlplane.ListRequest{
-					From: &lastRunCreatedAt,
+					Start: &lastRunCreatedAt,
 				},
 				runs: allRuns[len(allRuns)-1:],
 			},
 			{
 				name: "until 2nd run",
 				req: controlplane.ListRequest{
-					Until: &secondRunCreatedAt,
+					Finish: &secondRunCreatedAt,
 				},
 				runs: allRuns[:2],
 			},
 			{
 				name: "all the things",
 				req: controlplane.ListRequest{
-					From:  &secondRunCreatedAt,
-					Until: &lastRunCreatedAt,
-					Limit: &two,
+					Start:  &secondRunCreatedAt,
+					Finish: &lastRunCreatedAt,
+					Limit:  &two,
 				},
 				runs: allRuns[1:3],
 			},

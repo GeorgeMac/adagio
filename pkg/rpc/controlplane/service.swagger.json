@@ -28,14 +28,14 @@
         },
         "parameters": [
           {
-            "name": "from_ns",
+            "name": "start_ns",
             "in": "query",
             "required": false,
             "type": "string",
             "format": "int64"
           },
           {
-            "name": "until_ns",
+            "name": "finish_ns",
             "in": "query",
             "required": false,
             "type": "string",
@@ -67,14 +67,14 @@
         },
         "parameters": [
           {
-            "name": "from_ns",
+            "name": "start_ns",
             "in": "query",
             "required": false,
             "type": "string",
             "format": "int64"
           },
           {
-            "name": "until_ns",
+            "name": "finish_ns",
             "in": "query",
             "required": false,
             "type": "string",
