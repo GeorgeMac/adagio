@@ -208,7 +208,7 @@ func dfs(all edgeSet, from Node, dest []Node) []Node {
 		return dest
 	}
 
-	for node, _ := range targets {
+	for node := range targets {
 		dest = dfs(all, node, dest)
 	}
 

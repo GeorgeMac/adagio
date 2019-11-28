@@ -96,36 +96,36 @@ func Test_Graph_Edges(t *testing.T) {
 		{
 			Node:     a,
 			Incoming: map[Node]struct{}{},
-			Outgoing: map[Node]struct{}{c: struct{}{}, d: struct{}{}},
+			Outgoing: map[Node]struct{}{c: {}, d: {}},
 		},
 		{
 			Node:     b,
 			Incoming: map[Node]struct{}{},
-			Outgoing: map[Node]struct{}{d: struct{}{}, f: struct{}{}},
+			Outgoing: map[Node]struct{}{d: {}, f: {}},
 		},
 		{
 			Node:     c,
-			Incoming: map[Node]struct{}{a: struct{}{}},
-			Outgoing: map[Node]struct{}{e: struct{}{}},
+			Incoming: map[Node]struct{}{a: {}},
+			Outgoing: map[Node]struct{}{e: {}},
 		},
 		{
 			Node:     d,
-			Incoming: map[Node]struct{}{a: struct{}{}, b: struct{}{}},
-			Outgoing: map[Node]struct{}{e: struct{}{}},
+			Incoming: map[Node]struct{}{a: {}, b: {}},
+			Outgoing: map[Node]struct{}{e: {}},
 		},
 		{
 			Node:     e,
-			Incoming: map[Node]struct{}{c: struct{}{}, d: struct{}{}},
-			Outgoing: map[Node]struct{}{g: struct{}{}},
+			Incoming: map[Node]struct{}{c: {}, d: {}},
+			Outgoing: map[Node]struct{}{g: {}},
 		},
 		{
 			Node:     f,
-			Incoming: map[Node]struct{}{b: struct{}{}},
-			Outgoing: map[Node]struct{}{g: struct{}{}},
+			Incoming: map[Node]struct{}{b: {}},
+			Outgoing: map[Node]struct{}{g: {}},
 		},
 		{
 			Node:     g,
-			Incoming: map[Node]struct{}{e: struct{}{}, f: struct{}{}},
+			Incoming: map[Node]struct{}{e: {}, f: {}},
 			Outgoing: map[Node]struct{}{},
 		},
 	} {

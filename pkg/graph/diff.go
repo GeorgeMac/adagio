@@ -17,7 +17,7 @@ func Diff(a, b *Graph) []string {
 		for src, eset := range g.forward {
 			dest.nodes = append(dest.nodes, fmt.Sprintf("%v", src))
 
-			for target, _ := range eset {
+			for target := range eset {
 				dest.edges = append(dest.edges, fmt.Sprintf("%v to %v", src, target))
 			}
 		}

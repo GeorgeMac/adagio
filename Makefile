@@ -23,6 +23,10 @@ test-with-integrations: ## Run test suite with integrations (i.e. etcd)
 deps: ## Fetch and vendor dependencies
 	go mod download
 
+.PHONY: fmt
+fmt: ## Run go fmt -s all over the shop
+	@gofmt -s -w $(shell find . -name "*.go")
+
 .PHONY: protobuf
 protobuf: protobuf-deps ## Build protocol buffers into model and grpc service definitions
 	protoc --go_out=paths=source_relative:. ./pkg/adagio/adagio.proto
