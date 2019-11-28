@@ -27,7 +27,7 @@ func TestPool_HappyPath_NODE_READY(t *testing.T) {
 				name: "test",
 				newFunction: func() Function {
 					return function{
-						run: func(n *adagio.Node) (*adagio.Result, error) {
+						run: func(_ context.Context, n *adagio.Node) (*adagio.Result, error) {
 							atomic.AddUint64(&runCalls, 1)
 
 							require.Equal(t, n, node)
@@ -119,7 +119,7 @@ func TestPool_Error_RuntimeDoesNotExist(t *testing.T) {
 				name: "known",
 				newFunction: func() Function {
 					return function{
-						run: func(n *adagio.Node) (*adagio.Result, error) {
+						run: func(_ context.Context, n *adagio.Node) (*adagio.Result, error) {
 							atomic.AddUint64(&runCalls, 1)
 
 							require.Equal(t, n, node)
@@ -206,7 +206,7 @@ func TestPool_Error_RuntimeError(t *testing.T) {
 				name: "error",
 				newFunction: func() Function {
 					return function{
-						run: func(n *adagio.Node) (*adagio.Result, error) {
+						run: func(_ context.Context, n *adagio.Node) (*adagio.Result, error) {
 							atomic.AddUint64(&runCalls, 1)
 
 							require.Equal(t, n, node)
@@ -295,7 +295,7 @@ func TestPool_Error_NODE_ORPHANED(t *testing.T) {
 				name: "test",
 				newFunction: func() Function {
 					return function{
-						run: func(n *adagio.Node) (*adagio.Result, error) {
+						run: func(_ context.Context, n *adagio.Node) (*adagio.Result, error) {
 							atomic.AddUint64(&runCalls, 1)
 
 							require.Equal(t, n, node)

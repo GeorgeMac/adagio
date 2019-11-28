@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -89,7 +90,10 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 	})
 
 	t.Run("a run is created", func(t *testing.T) {
-		run, err := repo.StartRun(ExampleGraph)
+		var (
+			ctx      = context.Background()
+			run, err = repo.StartRun(ctx, ExampleGraph)
+		)
 		require.Nil(t, err)
 		require.NotNil(t, run)
 
@@ -217,11 +221,11 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				RunStatus: adagio.Run_COMPLETED,
 			},
 		} {
-			layer.Exec(t)
+			layer.Exec(t, ctx)
 		}
 
 		t.Run("the run is listed", func(t *testing.T) {
-			runs, err := repo.ListRuns(controlplane.ListRequest{})
+			runs, err := repo.ListRuns(ctx, controlplane.ListRequest{})
 			require.Nil(t, err)
 
 			assert.Len(t, runs, 1)
@@ -253,7 +257,10 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 	})
 
 	t.Run("a run with a failure", func(t *testing.T) {
-		run, err := repo.StartRun(ExampleGraph)
+		var (
+			ctx      = context.Background()
+			run, err = repo.StartRun(ctx, ExampleGraph)
+		)
 		require.Nil(t, err)
 		require.NotNil(t, run)
 
@@ -328,11 +335,11 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				RunStatus: adagio.Run_COMPLETED,
 			},
 		} {
-			layer.Exec(t)
+			layer.Exec(t, ctx)
 		}
 
 		t.Run("the run is listed", func(t *testing.T) {
-			runs, err := repo.ListRuns(controlplane.ListRequest{})
+			runs, err := repo.ListRuns(ctx, controlplane.ListRequest{})
 			require.Nil(t, err)
 
 			// the run is listed
@@ -363,23 +370,26 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 	})
 
 	t.Run("a run with retries", func(t *testing.T) {
-		// (a) --> (h) --> (c)
-		//                  ^
-		//                 /
-		//         (b) ----
-		run, err := repo.StartRun(&adagio.GraphSpec{
-			Nodes: []*adagio.Node_Spec{
-				a,
-				b,
-				c,
-				h,
-			},
-			Edges: []*adagio.Edge{
-				{Source: a.Name, Destination: h.Name},
-				{Source: b.Name, Destination: c.Name},
-				{Source: h.Name, Destination: c.Name},
-			},
-		})
+		var (
+			ctx = context.Background()
+			// (a) --> (h) --> (c)
+			//                  ^
+			//                 /
+			//         (b) ----
+			run, err = repo.StartRun(ctx, &adagio.GraphSpec{
+				Nodes: []*adagio.Node_Spec{
+					a,
+					b,
+					c,
+					h,
+				},
+				Edges: []*adagio.Edge{
+					{Source: a.Name, Destination: h.Name},
+					{Source: b.Name, Destination: c.Name},
+					{Source: h.Name, Destination: c.Name},
+				},
+			})
+		)
 		require.Nil(t, err)
 		require.NotNil(t, run)
 
@@ -487,11 +497,11 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				RunStatus: adagio.Run_COMPLETED,
 			},
 		} {
-			layer.Exec(t)
+			layer.Exec(t, ctx)
 		}
 
 		t.Run("the run is listed", func(t *testing.T) {
-			runs, err := repo.ListRuns(controlplane.ListRequest{})
+			runs, err := repo.ListRuns(ctx, controlplane.ListRequest{})
 			require.Nil(t, err)
 
 			// the run is listed
@@ -513,23 +523,26 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 	})
 
 	t.Run("a run with exhausted retries", func(t *testing.T) {
-		// (a) --> (i) --> (c)
-		//                  ^
-		//                 /
-		//         (b) ----
-		run, err := repo.StartRun(&adagio.GraphSpec{
-			Nodes: []*adagio.Node_Spec{
-				a,
-				b,
-				c,
-				i,
-			},
-			Edges: []*adagio.Edge{
-				{Source: a.Name, Destination: i.Name},
-				{Source: b.Name, Destination: c.Name},
-				{Source: i.Name, Destination: c.Name},
-			},
-		})
+		var (
+			ctx = context.Background()
+			// (a) --> (i) --> (c)
+			//                  ^
+			//                 /
+			//         (b) ----
+			run, err = repo.StartRun(ctx, &adagio.GraphSpec{
+				Nodes: []*adagio.Node_Spec{
+					a,
+					b,
+					c,
+					i,
+				},
+				Edges: []*adagio.Edge{
+					{Source: a.Name, Destination: i.Name},
+					{Source: b.Name, Destination: c.Name},
+					{Source: i.Name, Destination: c.Name},
+				},
+			})
+		)
 		require.Nil(t, err)
 		require.NotNil(t, run)
 
@@ -612,11 +625,11 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				RunStatus: adagio.Run_COMPLETED,
 			},
 		} {
-			layer.Exec(t)
+			layer.Exec(t, ctx)
 		}
 
 		t.Run("the run is listed", func(t *testing.T) {
-			runs, err := repo.ListRuns(controlplane.ListRequest{})
+			runs, err := repo.ListRuns(ctx, controlplane.ListRequest{})
 			require.Nil(t, err)
 
 			// the run is listed
@@ -637,13 +650,16 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 	})
 
 	t.Run("a run with an orphaned node", func(t *testing.T) {
-		// (a)
-		run, err := repo.StartRun(&adagio.GraphSpec{
-			Nodes: []*adagio.Node_Spec{
-				a,
-			},
-			Edges: []*adagio.Edge{},
-		})
+		var (
+			ctx = context.Background()
+			// (a)
+			run, err = repo.StartRun(ctx, &adagio.GraphSpec{
+				Nodes: []*adagio.Node_Spec{
+					a,
+				},
+				Edges: []*adagio.Edge{},
+			})
+		)
 		require.Nil(t, err)
 		require.NotNil(t, run)
 
@@ -652,7 +668,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 			events = make(chan *adagio.Event, 5)
 		)
 
-		err = repo.Subscribe(agent, events, adagio.Event_NODE_READY, adagio.Event_NODE_ORPHANED)
+		err = repo.Subscribe(ctx, agent, events, adagio.Event_NODE_READY, adagio.Event_NODE_ORPHANED)
 		require.Nil(t, err)
 
 		assert.Equal(t, adagio.Run_WAITING, run.Status)
@@ -669,7 +685,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 		var claims map[string]*adagio.Claim
 		t.Run("an initial claim is made", func(t *testing.T) {
 			// ensure node can initially be claimed
-			claims = canClaim(t, repo, run, map[string]*adagio.Node{"a": running(a, nil)})
+			claims = canClaim(t, ctx, repo, run, map[string]*adagio.Node{"a": running(a, nil)})
 		})
 
 		// orphan claim for node "a" from run
@@ -685,16 +701,16 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 
 		t.Run("the orphaned node", func(t *testing.T) {
 			// ensure orphaned node can be claimed again and has no results yet
-			claims = canClaim(t, repo, run, map[string]*adagio.Node{"a": running(a, nil)})
+			claims = canClaim(t, ctx, repo, run, map[string]*adagio.Node{"a": running(a, nil)})
 		})
 
 		// can error the node
-		canFinish(t, repo, run, map[string]adagio.Node_Result_Conclusion{
+		canFinish(t, ctx, repo, run, map[string]adagio.Node_Result_Conclusion{
 			"a": adagio.Node_Result_ERROR,
 		}, claims)
 
 		t.Run("the run is listed", func(t *testing.T) {
-			runs, err := repo.ListRuns(controlplane.ListRequest{})
+			runs, err := repo.ListRuns(ctx, controlplane.ListRequest{})
 			require.Nil(t, err)
 
 			// the run is listed
@@ -708,7 +724,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 	})
 
 	t.Run("a call to stats reports as expected", func(t *testing.T) {
-		stats, err := repo.Stats()
+		stats, err := repo.Stats(context.Background())
 		require.Nil(t, err)
 
 		assert.Equal(t, &adagio.Stats{
@@ -720,7 +736,10 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 	})
 
 	t.Run("list runs with predicates", func(t *testing.T) {
-		allRuns, err := repo.ListRuns(controlplane.ListRequest{})
+		var (
+			ctx          = context.Background()
+			allRuns, err = repo.ListRuns(ctx, controlplane.ListRequest{})
+		)
 		require.Nil(t, err)
 		require.Len(t, allRuns, 5)
 
@@ -773,7 +792,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 			},
 		} {
 			t.Run(test.name, func(t *testing.T) {
-				runs, err := repo.ListRuns(test.req)
+				runs, err := repo.ListRuns(ctx, test.req)
 				assert.Nil(t, err)
 
 				assert.Equal(t, test.runs, runs)
@@ -793,35 +812,35 @@ type TestLayer struct {
 	RunStatus   adagio.Run_Status
 }
 
-func (l *TestLayer) Exec(t *testing.T) {
+func (l *TestLayer) Exec(t *testing.T, ctx context.Context) {
 	t.Helper()
 
 	var (
 		agent     = &adagio.Agent{Id: "foo"}
 		events    = make(chan *adagio.Event, len(l.Events))
 		collected = make([]*adagio.Event, 0)
-		err       = l.Repository.Subscribe(agent, events, adagio.Event_NODE_READY)
+		err       = l.Repository.Subscribe(ctx, agent, events, adagio.Event_NODE_READY)
 	)
 	require.Nil(t, err)
 
 	defer func() {
-		l.Repository.UnsubscribeAll(agent, events)
+		l.Repository.UnsubscribeAll(ctx, agent, events)
 
 		close(events)
 	}()
 
 	var claims map[string]*adagio.Claim
 	t.Run(l.Name, func(t *testing.T) {
-		canNotClaim(t, l.Repository, l.Run, l.Unclaimable...)
+		canNotClaim(t, ctx, l.Repository, l.Run, l.Unclaimable...)
 
-		claims = canClaim(t, l.Repository, l.Run, l.Claimable)
+		claims = canClaim(t, ctx, l.Repository, l.Run, l.Claimable)
 	})
 
-	canFinish(t, l.Repository, l.Run, l.Finish, claims)
+	canFinish(t, ctx, l.Repository, l.Run, l.Finish, claims)
 
 	t.Run(fmt.Sprintf("the run is reported with a status of %q", l.RunStatus), func(t *testing.T) {
 		// check run reports expected status
-		run, err := l.Repository.InspectRun(l.Run.Id)
+		run, err := l.Repository.InspectRun(ctx, l.Run.Id)
 		require.Nil(t, err)
 		require.Equal(t, l.RunStatus, run.Status)
 	})
@@ -848,7 +867,7 @@ func (l *TestLayer) Exec(t *testing.T) {
 	}
 
 	t.Run("the subscribed agent is listed", func(t *testing.T) {
-		agents, err := l.Repository.ListAgents()
+		agents, err := l.Repository.ListAgents(ctx)
 		require.Nil(t, err)
 		require.Len(t, agents, 1)
 
@@ -856,7 +875,7 @@ func (l *TestLayer) Exec(t *testing.T) {
 	})
 }
 
-func canNotClaim(t *testing.T, repo Repository, run *adagio.Run, names ...string) {
+func canNotClaim(t *testing.T, ctx context.Context, repo Repository, run *adagio.Run, names ...string) {
 	t.Helper()
 
 	t.Run("can not claim", func(t *testing.T) {
@@ -867,7 +886,7 @@ func canNotClaim(t *testing.T, repo Repository, run *adagio.Run, names ...string
 				func(name string) {
 					t.Parallel()
 
-					_, _, err := repo.ClaimNode(run.Id, name, newClaim())
+					_, _, err := repo.ClaimNode(ctx, run.Id, name, newClaim())
 					assert.Equal(t, adagio.ErrNodeNotReady, errors.Cause(err))
 				}(name)
 			})
@@ -875,7 +894,7 @@ func canNotClaim(t *testing.T, repo Repository, run *adagio.Run, names ...string
 	})
 }
 
-func canClaim(t *testing.T, repo Repository, run *adagio.Run, nodes map[string]*adagio.Node) (claims map[string]*adagio.Claim) {
+func canClaim(t *testing.T, ctx context.Context, repo Repository, run *adagio.Run, nodes map[string]*adagio.Node) (claims map[string]*adagio.Claim) {
 	t.Helper()
 
 	var mu sync.Mutex
@@ -889,7 +908,7 @@ func canClaim(t *testing.T, repo Repository, run *adagio.Run, nodes map[string]*
 				func(name string, node *adagio.Node) {
 					t.Parallel()
 
-					claimed, claim := attemptNClaims(t, repo, run, name, 5)
+					claimed, claim := attemptNClaims(t, ctx, repo, run, name, 5)
 					node.Claim = claim
 
 					t.Run("and it returns the correct node", func(t *testing.T) {
@@ -907,7 +926,7 @@ func canClaim(t *testing.T, repo Repository, run *adagio.Run, nodes map[string]*
 	return
 }
 
-func canFinish(t *testing.T, repo Repository, run *adagio.Run, names map[string]adagio.Node_Result_Conclusion, claims map[string]*adagio.Claim) {
+func canFinish(t *testing.T, ctx context.Context, repo Repository, run *adagio.Run, names map[string]adagio.Node_Result_Conclusion, claims map[string]*adagio.Claim) {
 	t.Helper()
 
 	t.Run("can finish", func(t *testing.T) {
@@ -919,7 +938,7 @@ func canFinish(t *testing.T, repo Repository, run *adagio.Run, names map[string]
 				func(name string, conclusion adagio.Node_Result_Conclusion, claim *adagio.Claim) {
 					t.Parallel()
 
-					assert.Nil(t, repo.FinishNode(run.Id, name, &adagio.Node_Result{
+					assert.Nil(t, repo.FinishNode(ctx, run.Id, name, &adagio.Node_Result{
 						Conclusion: conclusion,
 						Output:     []byte(name),
 					}, claim))
@@ -929,7 +948,7 @@ func canFinish(t *testing.T, repo Repository, run *adagio.Run, names map[string]
 	})
 }
 
-func attemptNClaims(t *testing.T, repo Repository, run *adagio.Run, name string, n int) (node *adagio.Node, claim *adagio.Claim) {
+func attemptNClaims(t *testing.T, ctx context.Context, repo Repository, run *adagio.Run, name string, n int) (node *adagio.Node, claim *adagio.Claim) {
 	t.Helper()
 
 	t.Run("only one successful claim is made", func(t *testing.T) {
@@ -945,7 +964,7 @@ func attemptNClaims(t *testing.T, repo Repository, run *adagio.Run, name string,
 				defer wg.Done()
 				var (
 					cclaim         = newClaim()
-					cnode, ok, err = repo.ClaimNode(run.Id, name, cclaim)
+					cnode, ok, err = repo.ClaimNode(ctx, run.Id, name, cclaim)
 				)
 				require.Nil(t, err)
 

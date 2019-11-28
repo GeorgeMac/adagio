@@ -1,6 +1,7 @@
 package debug
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -125,7 +126,7 @@ func With(chances ...ChanceCondition) Option {
 // then loops over any provided chance conditions.
 // Given no chance condinition is met it returns the configured
 // adagio result conclusion
-func (function *Function) Run() (*adagio.Result, error) {
+func (function *Function) Run(ctx context.Context) (*adagio.Result, error) {
 	time.Sleep(time.Duration(function.Sleep))
 
 	for _, c := range function.Chances {

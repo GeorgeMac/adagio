@@ -1,6 +1,7 @@
 package exec
 
 import (
+	"context"
 	"os/exec"
 
 	"github.com/georgemac/adagio/pkg/adagio"
@@ -50,7 +51,7 @@ func NewFunction(command string, args ...string) *Function {
 
 // Run spawns a subprocess for the desired command and returns the combined
 // output writer as an adagio Result output slice of bytes
-func (fn *Function) Run() (*adagio.Result, error) {
+func (fn *Function) Run(context.Context) (*adagio.Result, error) {
 	data, err := exec.Command(fn.Command, fn.Args...).CombinedOutput()
 	if err != nil {
 		return nil, err

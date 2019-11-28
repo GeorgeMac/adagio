@@ -23,10 +23,10 @@ var (
 // notify of node related events, issue node claims and finalize the result
 // of executing a node
 type Repository interface {
-	ClaimNode(runID, name string, claim *adagio.Claim) (*adagio.Node, bool, error)
-	FinishNode(runID, name string, result *adagio.Node_Result, claim *adagio.Claim) error
-	Subscribe(agent *adagio.Agent, events chan<- *adagio.Event, types ...adagio.Event_Type) error
-	UnsubscribeAll(*adagio.Agent, chan<- *adagio.Event) error
+	ClaimNode(ctx context.Context, runID, name string, claim *adagio.Claim) (*adagio.Node, bool, error)
+	FinishNode(ctx context.Context, runID, name string, result *adagio.Node_Result, claim *adagio.Claim) error
+	Subscribe(ctx context.Context, agent *adagio.Agent, events chan<- *adagio.Event, types ...adagio.Event_Type) error
+	UnsubscribeAll(context.Context, *adagio.Agent, chan<- *adagio.Event) error
 }
 
 // RuntimeMap is a set of runtimes identified by name
@@ -65,7 +65,7 @@ func (n NamedRuntimeFunc) NewFunction() Function { return n.fn() }
 
 // Function is a type which can parse and execute a node
 type Function interface {
-	Run(*adagio.Node) (*adagio.Result, error)
+	Run(context.Context, *adagio.Node) (*adagio.Result, error)
 }
 
 // Claimer is used to generate claims
@@ -143,17 +143,23 @@ func (p *Pool) Run(ctxt context.Context) {
 			var (
 				events  = make(chan *adagio.Event, 10)
 				claimer = p.newClaimer()
+				ctx     = context.Background()
 			)
 
-			p.repo.Subscribe(agent, events, adagio.Event_NODE_READY, adagio.Event_NODE_ORPHANED)
+			p.repo.Subscribe(ctx, agent, events, adagio.Event_NODE_READY, adagio.Event_NODE_ORPHANED)
 
 			for {
 				select {
 				case event := <-events:
-					if err := p.handleEvent(claimer, event); err != nil {
-						log.Println(err)
-					}
+					func() {
+						var cancel context.CancelFunc
+						ctx, cancel = context.WithCancel(ctx)
+						defer cancel()
 
+						if err := p.handleEvent(ctx, claimer, event); err != nil {
+							log.Println(err)
+						}
+					}()
 				case <-ctxt.Done():
 					return
 				}
@@ -164,7 +170,7 @@ func (p *Pool) Run(ctxt context.Context) {
 	wg.Wait()
 }
 
-func (p *Pool) handleEvent(claimer Claimer, event *adagio.Event) error {
+func (p *Pool) handleEvent(ctx context.Context, claimer Claimer, event *adagio.Event) error {
 	runtime, ok := p.runtimes[event.NodeSpec.Runtime]
 	if !ok {
 		return ErrRuntimeDoesNotExist
@@ -173,7 +179,7 @@ func (p *Pool) handleEvent(claimer Claimer, event *adagio.Event) error {
 	// construct a new claim
 	claim := claimer.NewClaim()
 
-	node, claimed, err := p.repo.ClaimNode(event.RunID, event.NodeSpec.Name, claim)
+	node, claimed, err := p.repo.ClaimNode(ctx, event.RunID, event.NodeSpec.Name, claim)
 	if err != nil {
 		return err
 	}
@@ -194,7 +200,7 @@ func (p *Pool) handleEvent(claimer Claimer, event *adagio.Event) error {
 			fn     = runtime.NewFunction()
 		)
 
-		if result, err = fn.Run(node); err == nil {
+		if result, err = fn.Run(ctx, node); err == nil {
 			nodeResult = &adagio.Node_Result{
 				Conclusion: adagio.Node_Result_Conclusion(result.Conclusion),
 				Metadata:   result.Metadata,
@@ -211,7 +217,7 @@ func (p *Pool) handleEvent(claimer Claimer, event *adagio.Event) error {
 		nodeResult.Output = []byte(err.Error())
 	}
 
-	if err := p.repo.FinishNode(event.RunID, event.NodeSpec.Name, nodeResult, claim); err != nil {
+	if err := p.repo.FinishNode(ctx, event.RunID, event.NodeSpec.Name, nodeResult, claim); err != nil {
 		return err
 	}
 

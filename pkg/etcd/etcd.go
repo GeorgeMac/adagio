@@ -76,12 +76,12 @@ func New(kv clientv3.KV, watcher clientv3.Watcher, leaser clientv3.Lease, opts .
 	return r
 }
 
-func (r *Repository) Stats() (*adagio.Stats, error) {
+func (r *Repository) Stats(ctx context.Context) (*adagio.Stats, error) {
 	stats := &adagio.Stats{
 		NodeCounts: &adagio.Stats_NodeCounts{},
 	}
 
-	resp, err := r.kv.Get(context.Background(),
+	resp, err := r.kv.Get(ctx,
 		runsPrefix,
 		clientv3.WithPrefix(),
 		clientv3.WithCountOnly())
@@ -92,7 +92,7 @@ func (r *Repository) Stats() (*adagio.Stats, error) {
 	stats.RunCount = resp.Count
 
 	for status := range adagio.Node_Status_name {
-		resp, err := r.kv.Get(context.Background(),
+		resp, err := r.kv.Get(ctx,
 			nodesInStateKey(adagio.Node_Status(status)),
 			clientv3.WithPrefix(),
 			clientv3.WithCountOnly(),
@@ -116,7 +116,7 @@ func (r *Repository) Stats() (*adagio.Stats, error) {
 	return stats, nil
 }
 
-func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err error) {
+func (r *Repository) StartRun(ctx context.Context, spec *adagio.GraphSpec) (run *adagio.Run, err error) {
 	run, err = adagio.NewRun(spec)
 	if err != nil {
 		return
@@ -153,7 +153,7 @@ func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err erro
 		ops = append(ops, put, putState)
 	}
 
-	resp, err := r.kv.Txn(context.Background()).
+	resp, err := r.kv.Txn(ctx).
 		If(cmps...).
 		Then(ops...).
 		Commit()
@@ -168,13 +168,12 @@ func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err erro
 	return
 }
 
-func (r *Repository) InspectRun(id string) (*adagio.Run, error) {
-	return r.getRun(context.Background(), id)
+func (r *Repository) InspectRun(ctx context.Context, id string) (*adagio.Run, error) {
+	return r.getRun(ctx, id)
 }
 
-func (r *Repository) ListAgents() (agents []*adagio.Agent, err error) {
-	ctxt := context.Background()
-	resp, err := r.kv.Get(ctxt, agentsPrefix, clientv3.WithPrefix())
+func (r *Repository) ListAgents(ctx context.Context) (agents []*adagio.Agent, err error) {
+	resp, err := r.kv.Get(ctx, agentsPrefix, clientv3.WithPrefix())
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +190,7 @@ func (r *Repository) ListAgents() (agents []*adagio.Agent, err error) {
 	return
 }
 
-func (r *Repository) ListRuns(req controlplane.ListRequest) (runs []*adagio.Run, err error) {
+func (r *Repository) ListRuns(ctx context.Context, req controlplane.ListRequest) (runs []*adagio.Run, err error) {
 	var (
 		opts = []clientv3.OpOption{clientv3.WithPrefix()}
 		key  = runsPrefix
@@ -225,8 +224,7 @@ func (r *Repository) ListRuns(req controlplane.ListRequest) (runs []*adagio.Run,
 		opts = append(opts, clientv3.WithLimit(int64(*req.Limit)))
 	}
 
-	ctxt := context.Background()
-	resp, err := r.kv.Get(ctxt,
+	resp, err := r.kv.Get(ctx,
 		key,
 		append(opts, clientv3.WithSort(clientv3.SortByKey, clientv3.SortDescend))...)
 	if err != nil {
@@ -242,7 +240,7 @@ func (r *Repository) ListRuns(req controlplane.ListRequest) (runs []*adagio.Run,
 			continue
 		}
 
-		run, err := r.getRun(ctxt, parts[1])
+		run, err := r.getRun(ctx, parts[1])
 		if err != nil {
 			return nil, err
 		}
@@ -253,9 +251,8 @@ func (r *Repository) ListRuns(req controlplane.ListRequest) (runs []*adagio.Run,
 	return
 }
 
-func (r *Repository) ClaimNode(runID, name string, claim *adagio.Claim) (node *adagio.Node, claimed bool, err error) {
-	ctxt := context.Background()
-	run, err := r.getRun(ctxt, runID)
+func (r *Repository) ClaimNode(ctx context.Context, runID, name string, claim *adagio.Claim) (node *adagio.Node, claimed bool, err error) {
+	run, err := r.getRun(ctx, runID)
 	if err != nil {
 		return nil, false, err
 	}
@@ -289,12 +286,12 @@ func (r *Repository) ClaimNode(runID, name string, claim *adagio.Claim) (node *a
 		}
 	}()
 
-	cmps, ops, err := r.transition(ctxt, runID, node, adagio.Node_RUNNING, nil, nil, clientv3.WithLease(leaseID))
+	cmps, ops, err := r.transition(ctx, runID, node, adagio.Node_RUNNING, nil, nil, clientv3.WithLease(leaseID))
 	if err != nil {
 		return nil, false, err
 	}
 
-	resp, err := r.kv.Txn(ctxt).
+	resp, err := r.kv.Txn(ctx).
 		If(cmps...).
 		Then(ops...).
 		Commit()
@@ -309,11 +306,11 @@ func (r *Repository) ClaimNode(runID, name string, claim *adagio.Claim) (node *a
 	return node, resp.Succeeded, nil
 }
 
-func (r *Repository) complete(ctxt context.Context, runID string, node *adagio.Node, cmps []clientv3.Cmp, ops []clientv3.Op) ([]clientv3.Cmp, []clientv3.Op, error) {
+func (r *Repository) complete(ctx context.Context, runID string, node *adagio.Node, cmps []clientv3.Cmp, ops []clientv3.Op) ([]clientv3.Cmp, []clientv3.Op, error) {
 	// given node has not already been completed
 	if node.Status != adagio.Node_COMPLETED {
 		var err error
-		cmps, ops, err = r.transition(ctxt, runID, node, adagio.Node_COMPLETED, cmps, ops)
+		cmps, ops, err = r.transition(ctx, runID, node, adagio.Node_COMPLETED, cmps, ops)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -322,7 +319,7 @@ func (r *Repository) complete(ctxt context.Context, runID string, node *adagio.N
 	return cmps, ops, nil
 }
 
-func (r *Repository) transition(ctxt context.Context, runID string, node *adagio.Node, toStatus adagio.Node_Status, cmps []clientv3.Cmp, ops []clientv3.Op, putOpts ...clientv3.OpOption) ([]clientv3.Cmp, []clientv3.Op, error) {
+func (r *Repository) transition(ctx context.Context, runID string, node *adagio.Node, toStatus adagio.Node_Status, cmps []clientv3.Cmp, ops []clientv3.Op, putOpts ...clientv3.OpOption) ([]clientv3.Cmp, []clientv3.Op, error) {
 	var (
 		nodeKey = nodeKey(runID, node.Spec.Name)
 		fromKey = nodeInStateKey(runID, statusToString(node.Status), node.Spec.Name)
@@ -395,10 +392,10 @@ func (r *Repository) statusDoesNotExist(runID string, node *adagio.Node, status 
 
 func (r *Repository) lease(claimID string) (clientv3.LeaseID, error) {
 	// store lease keep-alive cancel func
-	ctxt, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 
 	// grant lease in seconds
-	leaseResp, err := r.leaser.Grant(ctxt, int64(r.ttl/time.Second))
+	leaseResp, err := r.leaser.Grant(ctx, int64(r.ttl/time.Second))
 	if err != nil {
 		return 0, err
 	}
@@ -420,7 +417,7 @@ func (r *Repository) lease(claimID string) (clientv3.LeaseID, error) {
 	go func() {
 		defer r.cancelLease(claimID)
 
-		resps, err := r.leaser.KeepAlive(ctxt, leaseResp.ID)
+		resps, err := r.leaser.KeepAlive(ctx, leaseResp.ID)
 		if err != nil {
 			log.Println(err)
 			return
@@ -446,9 +443,8 @@ func (r *Repository) cancelLease(claimID string) {
 	r.leaseMu.Unlock()
 }
 
-func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result, claim *adagio.Claim) error {
-	ctxt := context.Background()
-	run, err := r.getRun(ctxt, runID)
+func (r *Repository) FinishNode(ctx context.Context, runID, name string, result *adagio.Node_Result, claim *adagio.Claim) error {
+	run, err := r.getRun(ctx, runID)
 	if err != nil {
 		return err
 	}
@@ -471,18 +467,18 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result, 
 	)
 
 	if result.Conclusion == adagio.Node_Result_SUCCESS {
-		cmps, ops, err = r.handleSuccess(ctxt, run, node, result)
+		cmps, ops, err = r.handleSuccess(ctx, run, node, result)
 		if err != nil {
 			return err
 		}
 	} else {
-		cmps, ops, err = r.handleFailure(ctxt, run, node, result)
+		cmps, ops, err = r.handleFailure(ctx, run, node, result)
 		if err != nil {
 			return err
 		}
 	}
 
-	resp, err := r.kv.Txn(ctxt).
+	resp, err := r.kv.Txn(ctx).
 		If(cmps...).
 		Then(ops...).
 		Commit()
@@ -493,7 +489,7 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result, 
 	}
 
 	if !resp.Succeeded {
-		return r.FinishNode(run.Id, node.Spec.Name, result, claim)
+		return r.FinishNode(ctx, run.Id, node.Spec.Name, result, claim)
 	}
 
 	r.cancelLease(claim.Id)
@@ -501,8 +497,8 @@ func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result, 
 	return nil
 }
 
-func (r *Repository) handleSuccess(ctxt context.Context, run *adagio.Run, node *adagio.Node, result *adagio.Node_Result) ([]clientv3.Cmp, []clientv3.Op, error) {
-	cmps, ops, err := r.complete(ctxt, run.Id, node, nil, nil)
+func (r *Repository) handleSuccess(ctx context.Context, run *adagio.Run, node *adagio.Node, result *adagio.Node_Result) ([]clientv3.Cmp, []clientv3.Op, error) {
+	cmps, ops, err := r.complete(ctx, run.Id, node, nil, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -553,7 +549,7 @@ func (r *Repository) handleSuccess(ctxt context.Context, run *adagio.Run, node *
 		// if all nodes are now completed
 		// then the outgoing target is ready
 		if isReady {
-			cmps, ops, err = r.transition(ctxt, run.Id, out, adagio.Node_READY, cmps, ops)
+			cmps, ops, err = r.transition(ctx, run.Id, out, adagio.Node_READY, cmps, ops)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -563,13 +559,13 @@ func (r *Repository) handleSuccess(ctxt context.Context, run *adagio.Run, node *
 	return cmps, ops, nil
 }
 
-func (r *Repository) handleFailure(ctxt context.Context, run *adagio.Run, node *adagio.Node, result *adagio.Node_Result) ([]clientv3.Cmp, []clientv3.Op, error) {
+func (r *Repository) handleFailure(ctx context.Context, run *adagio.Run, node *adagio.Node, result *adagio.Node_Result) ([]clientv3.Cmp, []clientv3.Op, error) {
 	if adagio.CanRetry(node) {
 		// put node back into the ready state to be attempted again
-		return r.transition(ctxt, run.Id, node, adagio.Node_READY, nil, nil)
+		return r.transition(ctx, run.Id, node, adagio.Node_READY, nil, nil)
 	}
 
-	cmps, ops, err := r.complete(ctxt, run.Id, node, nil, nil)
+	cmps, ops, err := r.complete(ctx, run.Id, node, nil, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -582,7 +578,7 @@ func (r *Repository) handleFailure(ctxt context.Context, run *adagio.Run, node *
 
 		// complete outgoing nodes with nil result to signify
 		// no attempt has been made
-		cmps, ops, err = r.complete(ctxt, run.Id, node, cmps, ops)
+		cmps, ops, err = r.complete(ctx, run.Id, node, cmps, ops)
 		if err != nil {
 			return err
 		}
@@ -595,7 +591,7 @@ func (r *Repository) handleFailure(ctxt context.Context, run *adagio.Run, node *
 	return cmps, ops, nil
 }
 
-func (r *Repository) Subscribe(a *adagio.Agent, events chan<- *adagio.Event, typ ...adagio.Event_Type) error {
+func (r *Repository) Subscribe(ctx context.Context, a *adagio.Agent, events chan<- *adagio.Event, typ ...adagio.Event_Type) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -613,7 +609,7 @@ func (r *Repository) Subscribe(a *adagio.Agent, events chan<- *adagio.Event, typ
 		return err
 	}
 
-	if _, err := r.kv.Put(context.Background(), agentKey(a), string(agentData), clientv3.WithLease(leaseID)); err != nil {
+	if _, err := r.kv.Put(ctx, agentKey(a), string(agentData), clientv3.WithLease(leaseID)); err != nil {
 		return err
 	}
 
@@ -627,7 +623,10 @@ func (r *Repository) Subscribe(a *adagio.Agent, events chan<- *adagio.Event, typ
 		defer r.cancelLease(a.Id)
 
 		var (
-			ctxt   = context.Background()
+			// construct a new context for this operation
+			// as the subscription will be cancelled via
+			// an unsubscribe
+			ctx    = context.Background()
 			opts   = []clientv3.OpOption{clientv3.WithPrefix()}
 			filter = filter{
 				orphaned: !types(typ).contains(adagio.Event_NODE_ORPHANED),
@@ -636,7 +635,7 @@ func (r *Repository) Subscribe(a *adagio.Agent, events chan<- *adagio.Event, typ
 		)
 
 		// consume existing ready nodes
-		resp, err := r.kv.Get(ctxt, nodesInStateKey(adagio.Node_READY), clientv3.WithPrefix())
+		resp, err := r.kv.Get(ctx, nodesInStateKey(adagio.Node_READY), clientv3.WithPrefix())
 		if err != nil {
 			log.Println(err)
 			goto Watch
@@ -644,7 +643,7 @@ func (r *Repository) Subscribe(a *adagio.Agent, events chan<- *adagio.Event, typ
 
 		// handle ready node events
 		for _, kv := range resp.Kvs {
-			r.handleKeyEvent(ctxt, events, keyEvent{kv.Key, keyCreated}, filter, clientv3.WithRev(resp.Header.Revision))
+			r.handleKeyEvent(ctx, events, keyEvent{kv.Key, keyCreated}, filter, clientv3.WithRev(resp.Header.Revision))
 		}
 
 		// set the watch responses to return a revision higher than the response
@@ -653,7 +652,7 @@ func (r *Repository) Subscribe(a *adagio.Agent, events chan<- *adagio.Event, typ
 
 	Watch:
 		// watch for new events
-		watch := r.watcher.Watch(ctxt, statesPrefix, opts...)
+		watch := r.watcher.Watch(ctx, statesPrefix, opts...)
 		for {
 			var resp clientv3.WatchResponse
 			select {
@@ -684,7 +683,7 @@ func (r *Repository) Subscribe(a *adagio.Agent, events chan<- *adagio.Event, typ
 					kev.Type = keyDeleted
 				}
 
-				r.handleKeyEvent(ctxt, events, kev, filter, clientv3.WithRev(resp.Header.Revision))
+				r.handleKeyEvent(ctx, events, kev, filter, clientv3.WithRev(resp.Header.Revision))
 			}
 		}
 	}()
@@ -710,7 +709,7 @@ type filter struct {
 	ready    bool
 }
 
-func (r *Repository) handleKeyEvent(ctxt context.Context, dest chan<- *adagio.Event, ev keyEvent, filter filter, opts ...clientv3.OpOption) {
+func (r *Repository) handleKeyEvent(ctx context.Context, dest chan<- *adagio.Event, ev keyEvent, filter filter, opts ...clientv3.OpOption) {
 	keyParts := strings.Split(string(ev.Key), "/")
 	if len(keyParts) < 6 {
 		return
@@ -724,7 +723,7 @@ func (r *Repository) handleKeyEvent(ctxt context.Context, dest chan<- *adagio.Ev
 		return
 	}
 
-	run, err := r.getRun(context.Background(), keyParts[3], opts...)
+	run, err := r.getRun(ctx, keyParts[3], opts...)
 	if err != nil {
 		log.Println(keyParts[3], err)
 		return
@@ -762,10 +761,10 @@ func (r *Repository) handleKeyEvent(ctxt context.Context, dest chan<- *adagio.Ev
 	return
 }
 
-func (r *Repository) getRun(ctxt context.Context, id string, ops ...clientv3.OpOption) (*adagio.Run, error) {
+func (r *Repository) getRun(ctx context.Context, id string, ops ...clientv3.OpOption) (*adagio.Run, error) {
 	run := &adagio.Run{Id: id}
 
-	resp, err := r.kv.Get(ctxt, runKey(run), ops...)
+	resp, err := r.kv.Get(ctx, runKey(run), ops...)
 	if err != nil {
 		return nil, err
 	}
@@ -780,7 +779,7 @@ func (r *Repository) getRun(ctxt context.Context, id string, ops ...clientv3.OpO
 	}
 
 	// re-hydrate current node states
-	if err := r.nodesForRun(ctxt, run, ops...); err != nil {
+	if err := r.nodesForRun(ctx, run, ops...); err != nil {
 		return nil, err
 	}
 
@@ -806,14 +805,14 @@ func (r *Repository) getRun(ctxt context.Context, id string, ops ...clientv3.OpO
 	return run, nil
 }
 
-func (r *Repository) nodesForRun(ctxt context.Context, run *adagio.Run, ops ...clientv3.OpOption) error {
+func (r *Repository) nodesForRun(ctx context.Context, run *adagio.Run, ops ...clientv3.OpOption) error {
 	// ensure all calls use with prefix
 	ops = append(ops, clientv3.WithPrefix())
 
 	var (
 		prefix    = allNodesKey(run)
 		nodes     = map[string]*adagio.Node{}
-		resp, err = r.kv.Get(ctxt, prefix, ops...)
+		resp, err = r.kv.Get(ctx, prefix, ops...)
 	)
 
 	if err != nil {
@@ -840,7 +839,7 @@ func (r *Repository) nodesForRun(ctxt context.Context, run *adagio.Run, ops ...c
 		}
 
 		// check status key exists at store revision for each node
-		resp, err := r.kv.Get(ctxt, nodeInStateKey(run.Id, statusToString(node.Status), node.Spec.Name), ops...)
+		resp, err := r.kv.Get(ctx, nodeInStateKey(run.Id, statusToString(node.Status), node.Spec.Name), ops...)
 		if err != nil {
 			return err
 		}
@@ -858,7 +857,7 @@ func (r *Repository) nodesForRun(ctxt context.Context, run *adagio.Run, ops ...c
 	}
 
 	for _, node := range run.Nodes {
-		if err = r.setInputs(ctxt, run, node); err != nil {
+		if err = r.setInputs(ctx, run, node); err != nil {
 			return err
 		}
 	}
@@ -866,7 +865,7 @@ func (r *Repository) nodesForRun(ctxt context.Context, run *adagio.Run, ops ...c
 	return nil
 }
 
-func (r *Repository) setInputs(ctxt context.Context, run *adagio.Run, node *adagio.Node) error {
+func (r *Repository) setInputs(ctx context.Context, run *adagio.Run, node *adagio.Node) error {
 	// for each incoming node fetch their outputs
 	incoming, err := adagio.GraphFrom(run).Incoming(node)
 	if err != nil {
@@ -892,12 +891,12 @@ func (r *Repository) setInputs(ctxt context.Context, run *adagio.Run, node *adag
 	return nil
 }
 
-func (r *Repository) UnsubscribeAll(a *adagio.Agent, ch chan<- *adagio.Event) error {
+func (r *Repository) UnsubscribeAll(ctx context.Context, a *adagio.Agent, ch chan<- *adagio.Event) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	// delete agent key before the
-	_, err := r.kv.Delete(context.Background(), agentKey(a))
+	_, err := r.kv.Delete(ctx, agentKey(a))
 	if err != nil {
 		return err
 	}

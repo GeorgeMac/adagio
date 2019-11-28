@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"sync"
 
 	"github.com/georgemac/adagio/pkg/adagio"
@@ -16,10 +17,12 @@ func (r runtime) Name() string { return r.name }
 func (r runtime) NewFunction() Function { return r.newFunction() }
 
 type function struct {
-	run func(*adagio.Node) (*adagio.Result, error)
+	run func(context.Context, *adagio.Node) (*adagio.Result, error)
 }
 
-func (c function) Run(n *adagio.Node) (*adagio.Result, error) { return c.run(n) }
+func (c function) Run(ct context.Context, n *adagio.Node) (*adagio.Result, error) {
+	return c.run(ct, n)
+}
 
 type repository struct {
 	mu sync.Mutex
@@ -64,7 +67,7 @@ func claims(count int, runID, name string, claim *adagio.Claim) (calls []claimCa
 	return
 }
 
-func (r *repository) ClaimNode(runID string, name string, claim *adagio.Claim) (*adagio.Node, bool, error) {
+func (r *repository) ClaimNode(_ context.Context, runID string, name string, claim *adagio.Claim) (*adagio.Node, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -86,7 +89,7 @@ type finishCall struct {
 	claim       *adagio.Claim
 }
 
-func (r *repository) FinishNode(runID string, name string, result *adagio.Node_Result, claim *adagio.Claim) error {
+func (r *repository) FinishNode(_ context.Context, runID string, name string, result *adagio.Node_Result, claim *adagio.Claim) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -101,11 +104,11 @@ type subscribeCall struct {
 	types  []adagio.Event_Type
 }
 
-func (r *repository) UnsubscribeAll(*adagio.Agent, chan<- *adagio.Event) error {
+func (r *repository) UnsubscribeAll(context.Context, *adagio.Agent, chan<- *adagio.Event) error {
 	panic("not implemented")
 }
 
-func (r *repository) Subscribe(agent *adagio.Agent, events chan<- *adagio.Event, types ...adagio.Event_Type) error {
+func (r *repository) Subscribe(_ context.Context, agent *adagio.Agent, events chan<- *adagio.Event, types ...adagio.Event_Type) error {
 	r.mu.Lock()
 	defer func() {
 		r.subscriptionCount.Done()
