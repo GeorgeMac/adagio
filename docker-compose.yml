@@ -4,6 +4,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
+    image: docker.io/adagioworkflow/adagio
     command:
       - adagiod
       - -backend-type=etcd
@@ -16,6 +17,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
+    image: docker.io/adagioworkflow/adagio
     command:
       - adagiod
       - -backend-type=etcd
@@ -27,6 +29,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
+    image: docker.io/adagioworkflow/adagio
     command:
       - adagiogw
       - -adagiod-addr=api:7890
@@ -40,6 +43,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.ui
+    image: docker.io/adagioworkflow/ui
     ports:
       - "8080:8080"
     depends_on:

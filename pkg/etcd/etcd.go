@@ -269,6 +269,12 @@ func (r *Repository) ListRuns(ctx context.Context, req controlplane.ListRequest)
 // ClaimNode attempts to claim a node identified by name for a specified run ID and providing a unique claim
 // Given the node is found and the claim is successful the node is returned and the claimed boolean with be true
 func (r *Repository) ClaimNode(ctx context.Context, runID, name string, claim *adagio.Claim) (node *adagio.Node, claimed bool, err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("error claiming node: %w", err)
+		}
+	}()
+
 	run, err := r.getRun(ctx, runID)
 	if err != nil {
 		return nil, false, err
@@ -303,7 +309,7 @@ func (r *Repository) ClaimNode(ctx context.Context, runID, name string, claim *a
 		}
 	}()
 
-	cmps, ops, err := r.transition(ctx, runID, node, adagio.Node_RUNNING, nil, nil, clientv3.WithLease(leaseID))
+	cmps, ops, err := r.transition(runID, node, adagio.Node_RUNNING, nil, nil, clientv3.WithLease(leaseID))
 	if err != nil {
 		return nil, false, err
 	}
@@ -323,11 +329,11 @@ func (r *Repository) ClaimNode(ctx context.Context, runID, name string, claim *a
 	return node, resp.Succeeded, nil
 }
 
-func (r *Repository) complete(ctx context.Context, runID string, node *adagio.Node, cmps []clientv3.Cmp, ops []clientv3.Op) ([]clientv3.Cmp, []clientv3.Op, error) {
+func (r *Repository) complete(runID string, node *adagio.Node, cmps []clientv3.Cmp, ops []clientv3.Op) ([]clientv3.Cmp, []clientv3.Op, error) {
 	// given node has not already been completed
 	if node.Status != adagio.Node_COMPLETED {
 		var err error
-		cmps, ops, err = r.transition(ctx, runID, node, adagio.Node_COMPLETED, cmps, ops)
+		cmps, ops, err = r.transition(runID, node, adagio.Node_COMPLETED, cmps, ops)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -336,7 +342,7 @@ func (r *Repository) complete(ctx context.Context, runID string, node *adagio.No
 	return cmps, ops, nil
 }
 
-func (r *Repository) transition(ctx context.Context, runID string, node *adagio.Node, toStatus adagio.Node_Status, cmps []clientv3.Cmp, ops []clientv3.Op, putOpts ...clientv3.OpOption) ([]clientv3.Cmp, []clientv3.Op, error) {
+func (r *Repository) transition(runID string, node *adagio.Node, toStatus adagio.Node_Status, cmps []clientv3.Cmp, ops []clientv3.Op, putOpts ...clientv3.OpOption) ([]clientv3.Cmp, []clientv3.Op, error) {
 	var (
 		nodeKey = nodeKey(runID, node.Spec.Name)
 		fromKey = nodeInStateKey(runID, statusToString(node.Status), node.Spec.Name)
@@ -461,7 +467,13 @@ func (r *Repository) cancelLease(claimID string) {
 }
 
 // FinishNode records a result for a node identified by name for a specified run ID and given a unique and active claim
-func (r *Repository) FinishNode(ctx context.Context, runID, name string, result *adagio.Node_Result, claim *adagio.Claim) error {
+func (r *Repository) FinishNode(ctx context.Context, runID, name string, result *adagio.Node_Result, claim *adagio.Claim) (err error) {
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf("error finishing node: %w", err)
+		}
+	}()
+
 	run, err := r.getRun(ctx, runID)
 	if err != nil {
 		return err
@@ -516,7 +528,7 @@ func (r *Repository) FinishNode(ctx context.Context, runID, name string, result 
 }
 
 func (r *Repository) handleSuccess(ctx context.Context, run *adagio.Run, node *adagio.Node, result *adagio.Node_Result) ([]clientv3.Cmp, []clientv3.Op, error) {
-	cmps, ops, err := r.complete(ctx, run.Id, node, nil, nil)
+	cmps, ops, err := r.complete(run.Id, node, nil, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -567,7 +579,7 @@ func (r *Repository) handleSuccess(ctx context.Context, run *adagio.Run, node *a
 		// if all nodes are now completed
 		// then the outgoing target is ready
 		if isReady {
-			cmps, ops, err = r.transition(ctx, run.Id, out, adagio.Node_READY, cmps, ops)
+			cmps, ops, err = r.transition(run.Id, out, adagio.Node_READY, cmps, ops)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -580,10 +592,10 @@ func (r *Repository) handleSuccess(ctx context.Context, run *adagio.Run, node *a
 func (r *Repository) handleFailure(ctx context.Context, run *adagio.Run, node *adagio.Node, result *adagio.Node_Result) ([]clientv3.Cmp, []clientv3.Op, error) {
 	if adagio.CanRetry(node) {
 		// put node back into the ready state to be attempted again
-		return r.transition(ctx, run.Id, node, adagio.Node_READY, nil, nil)
+		return r.transition(run.Id, node, adagio.Node_READY, nil, nil)
 	}
 
-	cmps, ops, err := r.complete(ctx, run.Id, node, nil, nil)
+	cmps, ops, err := r.complete(run.Id, node, nil, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -596,7 +608,7 @@ func (r *Repository) handleFailure(ctx context.Context, run *adagio.Run, node *a
 
 		// complete outgoing nodes with nil result to signify
 		// no attempt has been made
-		cmps, ops, err = r.complete(ctx, run.Id, node, cmps, ops)
+		cmps, ops, err = r.complete(run.Id, node, cmps, ops)
 		if err != nil {
 			return err
 		}
@@ -877,7 +889,7 @@ func (r *Repository) nodesForRun(ctx context.Context, run *adagio.Run, ops ...cl
 	}
 
 	for _, node := range run.Nodes {
-		if err = r.setInputs(ctx, run, node); err != nil {
+		if err = r.setInputs(run, node); err != nil {
 			return err
 		}
 	}
@@ -885,7 +897,7 @@ func (r *Repository) nodesForRun(ctx context.Context, run *adagio.Run, ops ...cl
 	return nil
 }
 
-func (r *Repository) setInputs(ctx context.Context, run *adagio.Run, node *adagio.Node) error {
+func (r *Repository) setInputs(run *adagio.Run, node *adagio.Node) error {
 	// for each incoming node fetch their outputs
 	incoming, err := adagio.GraphFrom(run).Incoming(node)
 	if err != nil {

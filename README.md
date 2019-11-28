@@ -1,8 +1,10 @@
 ![Adagio Logo](ui/src/assets/images/logo.png) Adagio - A Workflow Orchestrator
 ------------------------------------------------------------------------------
 
+![GitHub go.mod Go version](https://img.shields.io/github/go-mod/go-version/georgemac/adagio)
 [![Github Actions](https://github.com/georgemac/adagio/workflows/Go/badge.svg)](https://github.com/GeorgeMac/adagio/actions)
 [![Go Report Card](https://goreportcard.com/badge/github.com/georgemac/adagio)](https://goreportcard.com/report/github.com/georgemac/adagio)
+[![Adagio Docker Image](https://images.microbadger.com/badges/version/adagioworkflow/adagio.svg)](https://hub.docker.com/repository/docker/adagioworkflow/adagio)
 
 ![architecture](docs/architecture.svg)
 

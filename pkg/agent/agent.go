@@ -151,15 +151,14 @@ func (p *Pool) Run(ctxt context.Context) {
 			for {
 				select {
 				case event := <-events:
-					func() {
-						var cancel context.CancelFunc
-						ctx, cancel = context.WithCancel(ctx)
+					func(event *adagio.Event) {
+						ctx, cancel := context.WithCancel(ctx)
 						defer cancel()
 
 						if err := p.handleEvent(ctx, claimer, event); err != nil {
 							log.Println(err)
 						}
-					}()
+					}(event)
 				case <-ctxt.Done():
 					return
 				}
@@ -216,6 +215,8 @@ func (p *Pool) handleEvent(ctx context.Context, claimer Claimer, event *adagio.E
 		nodeResult.Conclusion = adagio.Node_Result_ERROR
 		nodeResult.Output = []byte(err.Error())
 	}
+
+	log.Printf("finising run %q node %q\n", event.RunID, event.NodeSpec.Name)
 
 	if err := p.repo.FinishNode(ctx, event.RunID, event.NodeSpec.Name, nodeResult, claim); err != nil {
 		return err
