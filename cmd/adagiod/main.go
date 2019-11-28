@@ -13,13 +13,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/georgemac/adagio/pkg/agent"
 	"github.com/georgemac/adagio/pkg/etcd"
 	"github.com/georgemac/adagio/pkg/memory"
 	"github.com/georgemac/adagio/pkg/rpc/controlplane"
 	"github.com/georgemac/adagio/pkg/runtimes/debug"
 	"github.com/georgemac/adagio/pkg/runtimes/exec"
 	controlservice "github.com/georgemac/adagio/pkg/service/controlplane"
-	"github.com/georgemac/adagio/pkg/worker"
 	"github.com/peterbourgon/ff"
 	"github.com/peterbourgon/ff/fftoml"
 	"go.etcd.io/etcd/clientv3"
@@ -28,7 +28,7 @@ import (
 
 type Repository interface {
 	controlservice.Repository
-	worker.Repository
+	agent.Repository
 }
 
 func main() {
@@ -101,7 +101,7 @@ func main() {
 		go func() {
 			defer wg.Done()
 
-			api(ctxt, repo)
+			startAPI(ctxt, repo)
 		}()
 	}
 
@@ -112,14 +112,14 @@ func main() {
 
 			log.Printf("Agent accepting work from %q backend\n", *backend)
 
-			agent(ctxt, repo)
+			startAgents(ctxt, repo)
 		}()
 	}
 
 	wg.Wait()
 }
 
-func api(ctxt context.Context, repo controlservice.Repository) {
+func startAPI(ctxt context.Context, repo controlservice.Repository) {
 	var (
 		service       = controlservice.New(repo)
 		addr          = ":7890"
@@ -146,10 +146,10 @@ func api(ctxt context.Context, repo controlservice.Repository) {
 	}
 }
 
-func agent(ctxt context.Context, repo worker.Repository) {
-	runtimes := worker.RuntimeMap{}
+func startAgents(ctxt context.Context, repo agent.Repository) {
+	runtimes := agent.RuntimeMap{}
 	runtimes.Register(exec.Runtime())
 	runtimes.Register(debug.Runtime())
 
-	worker.NewPool(repo, runtimes, worker.WithWorkerCount(5)).Run(ctxt)
+	agent.NewPool(repo, runtimes, agent.WithAgentCount(5)).Run(ctxt)
 }

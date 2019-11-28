@@ -7,15 +7,15 @@ import (
 	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
+	"github.com/georgemac/adagio/pkg/agent"
 	"github.com/georgemac/adagio/pkg/graph"
 	"github.com/georgemac/adagio/pkg/service/controlplane"
-	"github.com/georgemac/adagio/pkg/worker"
 	"github.com/pkg/errors"
 )
 
 var (
-	// compile time check to ensure Repository is a worker.Repository
-	_ worker.Repository       = (*Repository)(nil)
+	// compile time check to ensure Repository is a agent.Repository
+	_ agent.Repository        = (*Repository)(nil)
 	_ controlplane.Repository = (*Repository)(nil)
 )
 

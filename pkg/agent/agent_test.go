@@ -1,4 +1,4 @@
-package worker
+package agent
 
 import (
 	"context"
@@ -51,7 +51,7 @@ func TestPool_HappyPath_NODE_READY(t *testing.T) {
 			})
 		}
 
-		pool = NewPool(&repo, RuntimeMap(runtimes), WithWorkerCount(5), WithClaimerFunc(claimFunc))
+		pool = NewPool(&repo, RuntimeMap(runtimes), WithAgentCount(5), WithClaimerFunc(claimFunc))
 
 		done         = make(chan struct{})
 		ctxt, cancel = context.WithCancel(context.Background())
@@ -142,7 +142,7 @@ func TestPool_Error_RuntimeDoesNotExist(t *testing.T) {
 				return claim
 			})
 		}
-		pool = NewPool(&repo, runtimes, WithWorkerCount(5), WithClaimerFunc(claimFunc))
+		pool = NewPool(&repo, runtimes, WithAgentCount(5), WithClaimerFunc(claimFunc))
 
 		done         = make(chan struct{})
 		ctxt, cancel = context.WithCancel(context.Background())
@@ -227,7 +227,7 @@ func TestPool_Error_RuntimeError(t *testing.T) {
 				return claim
 			})
 		}
-		pool = NewPool(&repo, runtimes, WithWorkerCount(5), WithClaimerFunc(claimFunc))
+		pool = NewPool(&repo, runtimes, WithAgentCount(5), WithClaimerFunc(claimFunc))
 
 		done         = make(chan struct{})
 		ctxt, cancel = context.WithCancel(context.Background())
@@ -318,7 +318,7 @@ func TestPool_Error_NODE_ORPHANED(t *testing.T) {
 				return claim
 			})
 		}
-		pool = NewPool(&repo, runtimes, WithWorkerCount(5), WithClaimerFunc(claimFunc))
+		pool = NewPool(&repo, runtimes, WithAgentCount(5), WithClaimerFunc(claimFunc))
 
 		done         = make(chan struct{})
 		ctxt, cancel = context.WithCancel(context.Background())

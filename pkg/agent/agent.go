@@ -1,4 +1,4 @@
-package worker
+package agent
 
 import (
 	"context"
@@ -79,7 +79,7 @@ type ClaimerFunc func() *adagio.Claim
 // NewClaim delegates to underlying ClaimerFunc
 func (fn ClaimerFunc) NewClaim() *adagio.Claim { return fn() }
 
-// Pool spins up a number of worker goroutines which subscribe to nodes
+// Pool spins up a number of agent goroutines which subscribe to nodes
 // transitioning into the ready state and then attempts to claim and
 // process them
 type Pool struct {
@@ -113,7 +113,7 @@ func NewPool(repo Repository, runtimes RuntimeMap, opts ...Option) *Pool {
 	return pool
 }
 
-// Run begins the configured number of workers and responds to cancelation
+// Run begins the configured number of agents and responds to cancelation
 // of the supplied context
 func (p *Pool) Run(ctxt context.Context) {
 	var (

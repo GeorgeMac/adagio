@@ -55,7 +55,7 @@ type ParseRunner interface {
 }
 
 // FunctionAdaptor is the type used to covert a ParseRunner
-// into a worker.Function compatable type
+// into a agent.Function compatable type
 type FunctionAdaptor struct {
 	runner ParseRunner
 }
@@ -70,7 +70,7 @@ func (p FunctionAdaptor) Run(n *adagio.Node) (*adagio.Result, error) {
 	return p.runner.Run()
 }
 
-// Function converts the provided ParseRunner into a worker.Function
+// Function converts the provided ParseRunner into a agent.Function
 // using the FunctionAdaptor wrapper type
 func Function(runner ParseRunner) FunctionAdaptor {
 	return FunctionAdaptor{runner}

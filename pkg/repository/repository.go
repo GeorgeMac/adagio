@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
+	"github.com/georgemac/adagio/pkg/agent"
 	"github.com/georgemac/adagio/pkg/service/controlplane"
-	"github.com/georgemac/adagio/pkg/worker"
 	"github.com/kr/pretty"
 	"github.com/oklog/ulid/v2"
 	"github.com/pkg/errors"
@@ -68,7 +68,7 @@ var (
 
 type Repository interface {
 	controlplane.Repository
-	worker.Repository
+	agent.Repository
 }
 
 type Orphaner interface {

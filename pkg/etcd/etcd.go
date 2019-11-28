@@ -12,16 +12,16 @@ import (
 	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
+	"github.com/georgemac/adagio/pkg/agent"
 	"github.com/georgemac/adagio/pkg/graph"
 	"github.com/georgemac/adagio/pkg/service/controlplane"
-	"github.com/georgemac/adagio/pkg/worker"
 	"github.com/oklog/ulid"
 	"go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/clientv3/namespace"
 )
 
 var (
-	_ worker.Repository       = (*Repository)(nil)
+	_ agent.Repository        = (*Repository)(nil)
 	_ controlplane.Repository = (*Repository)(nil)
 
 	minULID = ulid.MustNew(0, zeroReader{})
@@ -613,7 +613,7 @@ func (r *Repository) Subscribe(a *adagio.Agent, events chan<- *adagio.Event, typ
 		return err
 	}
 
-	if _, err := r.kv.Put(context.Background(), agent(a), string(agentData), clientv3.WithLease(leaseID)); err != nil {
+	if _, err := r.kv.Put(context.Background(), agentKey(a), string(agentData), clientv3.WithLease(leaseID)); err != nil {
 		return err
 	}
 
@@ -897,7 +897,7 @@ func (r *Repository) UnsubscribeAll(a *adagio.Agent, ch chan<- *adagio.Event) er
 	defer r.mu.Unlock()
 
 	// delete agent key before the
-	_, err := r.kv.Delete(context.Background(), agent(a))
+	_, err := r.kv.Delete(context.Background(), agentKey(a))
 	if err != nil {
 		return err
 	}
@@ -914,7 +914,7 @@ func (r *Repository) UnsubscribeAll(a *adagio.Agent, ch chan<- *adagio.Event) er
 	return nil
 }
 
-func agent(agent *adagio.Agent) string {
+func agentKey(agent *adagio.Agent) string {
 	return agentsPrefix + agent.Id
 }
 

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
+	"github.com/georgemac/adagio/pkg/agent"
 	runtime "github.com/georgemac/adagio/pkg/runtimes"
-	"github.com/georgemac/adagio/pkg/worker"
 	"github.com/georgemac/adagio/pkg/workflow"
 )
 
@@ -20,8 +20,8 @@ var (
 )
 
 // Runtime returns the debub packages runtime
-func Runtime() worker.Runtime {
-	return worker.RuntimeFunc(name, func() worker.Function {
+func Runtime() agent.Runtime {
+	return agent.RuntimeFunc(name, func() agent.Function {
 		return runtime.Function(blankFunction())
 	})
 }
