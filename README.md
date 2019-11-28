@@ -2,6 +2,7 @@
 ------------------------------------------------------------------------------
 
 [![Github Actions](https://github.com/georgemac/adagio/workflows/Go/badge.svg)](https://github.com/GeorgeMac/adagio/actions)
+[![Go Report Card](https://goreportcard.com/badge/github.com/georgemac/adagio)](https://goreportcard.com/report/github.com/georgemac/adagio)
 
 ![architecture](docs/architecture.svg)
 
