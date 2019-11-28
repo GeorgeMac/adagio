@@ -221,7 +221,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 		}
 
 		t.Run("the run is listed", func(t *testing.T) {
-			runs, err := repo.ListRuns()
+			runs, err := repo.ListRuns(controlplane.ListRequest{})
 			require.Nil(t, err)
 
 			assert.Len(t, runs, 1)
@@ -332,12 +332,12 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 		}
 
 		t.Run("the run is listed", func(t *testing.T) {
-			runs, err := repo.ListRuns()
+			runs, err := repo.ListRuns(controlplane.ListRequest{})
 			require.Nil(t, err)
 
 			// the run is listed
 			assert.Len(t, runs, 2)
-			assert.Equal(t, run.Id, runs[1].Id)
+			assert.Equal(t, run.Id, runs[0].Id)
 
 			assert.Equal(t, []*adagio.Node{
 				completed(a, nil, success("a")),
@@ -358,7 +358,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				completed(g, map[string][]byte{
 					"f": []byte("f"),
 				}),
-			}, stripClaims(runs[1].Nodes))
+			}, stripClaims(runs[0].Nodes))
 		})
 	})
 
@@ -491,12 +491,12 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 		}
 
 		t.Run("the run is listed", func(t *testing.T) {
-			runs, err := repo.ListRuns()
+			runs, err := repo.ListRuns(controlplane.ListRequest{})
 			require.Nil(t, err)
 
 			// the run is listed
 			assert.Len(t, runs, 3)
-			assert.Equal(t, run.Id, runs[2].Id)
+			assert.Equal(t, run.Id, runs[0].Id)
 
 			assert.Equal(t, []*adagio.Node{
 				completed(a, nil, success("a")),
@@ -508,7 +508,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				completed(h, map[string][]byte{
 					"a": []byte("a"),
 				}, errorResult("h"), success("h")),
-			}, stripClaims(runs[2].Nodes))
+			}, stripClaims(runs[0].Nodes))
 		})
 	})
 
@@ -616,12 +616,12 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 		}
 
 		t.Run("the run is listed", func(t *testing.T) {
-			runs, err := repo.ListRuns()
+			runs, err := repo.ListRuns(controlplane.ListRequest{})
 			require.Nil(t, err)
 
 			// the run is listed
 			assert.Len(t, runs, 4)
-			assert.Equal(t, run.Id, runs[3].Id)
+			assert.Equal(t, run.Id, runs[0].Id)
 
 			assert.Equal(t, []*adagio.Node{
 				completed(a, nil, success("a")),
@@ -632,7 +632,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				completed(i, map[string][]byte{
 					"a": []byte("a"),
 				}, fail("i"), fail("i")),
-			}, stripClaims(runs[3].Nodes))
+			}, stripClaims(runs[0].Nodes))
 		})
 	})
 
@@ -694,16 +694,16 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 		}, claims)
 
 		t.Run("the run is listed", func(t *testing.T) {
-			runs, err := repo.ListRuns()
+			runs, err := repo.ListRuns(controlplane.ListRequest{})
 			require.Nil(t, err)
 
 			// the run is listed
 			assert.Len(t, runs, 5)
-			assert.Equal(t, run.Id, runs[4].Id)
+			assert.Equal(t, run.Id, runs[0].Id)
 
 			assert.Equal(t, []*adagio.Node{
 				completed(a, nil, errorResult("a")),
-			}, stripClaims(runs[4].Nodes))
+			}, stripClaims(runs[0].Nodes))
 		})
 	})
 
@@ -717,6 +717,68 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				CompletedCount: 23,
 			},
 		}, stats)
+	})
+
+	t.Run("list runs with predicates", func(t *testing.T) {
+		allRuns, err := repo.ListRuns(controlplane.ListRequest{})
+		require.Nil(t, err)
+		require.Len(t, allRuns, 5)
+
+		var (
+			two                   = uint64(2)
+			three                 = uint64(3)
+			secondRunCreatedAt, _ = time.Parse(time.RFC3339Nano, allRuns[1].CreatedAt)
+			lastRunCreatedAt, _   = time.Parse(time.RFC3339Nano, allRuns[len(allRuns)-1].CreatedAt)
+		)
+
+		for _, test := range []struct {
+			name string
+			req  controlplane.ListRequest
+			runs []*adagio.Run
+		}{
+			{
+				name: "limit",
+				req:  controlplane.ListRequest{Limit: &three},
+				runs: allRuns[:3],
+			},
+			{
+				name: "from 2nd run",
+				req: controlplane.ListRequest{
+					Start: &secondRunCreatedAt,
+				},
+				runs: allRuns[1:],
+			},
+			{
+				name: "from last run",
+				req: controlplane.ListRequest{
+					Start: &lastRunCreatedAt,
+				},
+				runs: allRuns[len(allRuns)-1:],
+			},
+			{
+				name: "until 2nd run",
+				req: controlplane.ListRequest{
+					Finish: &secondRunCreatedAt,
+				},
+				runs: allRuns[:2],
+			},
+			{
+				name: "all the things",
+				req: controlplane.ListRequest{
+					Start:  &secondRunCreatedAt,
+					Finish: &lastRunCreatedAt,
+					Limit:  &two,
+				},
+				runs: allRuns[1:3],
+			},
+		} {
+			t.Run(test.name, func(t *testing.T) {
+				runs, err := repo.ListRuns(test.req)
+				assert.Nil(t, err)
+
+				assert.Equal(t, test.runs, runs)
+			})
+		}
 	})
 }
 

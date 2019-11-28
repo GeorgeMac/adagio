@@ -2,6 +2,7 @@ package controlplane
 
 import (
 	"context"
+	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
 	"github.com/georgemac/adagio/pkg/rpc/controlplane"
@@ -14,8 +15,14 @@ type Repository interface {
 	Stats() (*adagio.Stats, error)
 	StartRun(*adagio.GraphSpec) (*adagio.Run, error)
 	InspectRun(id string) (*adagio.Run, error)
-	ListRuns() ([]*adagio.Run, error)
+	ListRuns(ListRequest) ([]*adagio.Run, error)
 	ListAgents() ([]*adagio.Agent, error)
+}
+
+type ListRequest struct {
+	Start  *time.Time
+	Finish *time.Time
+	Limit  *uint64
 }
 
 type Service struct {
@@ -57,8 +64,22 @@ func (s *Service) Inspect(_ context.Context, req *controlplane.InspectRequest) (
 	return &controlplane.InspectResponse{Run: run}, nil
 }
 
-func (s *Service) ListRuns(_ context.Context, _ *controlplane.ListRequest) (*controlplane.ListRunsResponse, error) {
-	runs, err := s.repo.ListRuns()
+func (s *Service) ListRuns(_ context.Context, r *controlplane.ListRequest) (*controlplane.ListRunsResponse, error) {
+	req := ListRequest{
+		Limit: &r.Limit,
+	}
+
+	if r.StartNs > 0 {
+		from := time.Unix(0, r.StartNs)
+		req.Start = &from
+	}
+
+	if r.FinishNs > 0 {
+		until := time.Unix(0, r.FinishNs)
+		req.Finish = &until
+	}
+
+	runs, err := s.repo.ListRuns(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "control plane: listing runs")
 	}

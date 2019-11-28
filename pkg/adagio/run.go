@@ -23,7 +23,7 @@ func NewRun(spec *GraphSpec) (run *Run, err error) {
 		now := time.Now().UTC()
 		run = &Run{
 			Id:        ulid.MustNew(ulid.Timestamp(now), entropy).String(),
-			CreatedAt: now.Format(time.RFC3339),
+			CreatedAt: now.Format(time.RFC3339Nano),
 			Edges:     spec.Edges,
 			Nodes:     buildNodes(spec.Nodes),
 		}
