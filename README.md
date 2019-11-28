@@ -12,6 +12,10 @@ A workflow is a directed acyclic graph (DAG) within which the vertices describe 
 
 Adagio focusses primarily on orchestration of workflow execution. The execution of "work" defined within the vertices of the graph is intended to be extensible via a combination of native handlers and a plugin architecture. Rather than dictated by what can be implemented within this project.
 
+# Documentation
+
+Please see the [Architecture Documentation](./docs/ARCHITECTURE.md) for more details on how Adagio facilitates distributed execution of workflows and how it is intended to be deployed.
+
 # Usage
 
 ## test drive
