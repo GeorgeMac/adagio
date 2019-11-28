@@ -1,7 +1,7 @@
 adagiod - the adagio work agent
 -------------------------------
 
-`adagiod` is a binary which contains both the control plan API and the work consuming agent. It can simultaneously be run as both by ommitting either of the sub-commands (agent or api). Otherwise, it can be run as a standalone api or agent process. Note that the in-memory (-backend-type=memory) backend repository is pointless when adagiod is configured as seperate api and agent processes. Instead use a remote backend for deployment scenarios such as this (currently only "etcd" is supported here).
+`adagiod` is a binary which contains both the control plane API and the work consuming agent. It can simultaneously be run as both by ommitting either of the sub-commands (agent or api). Otherwise, it can be run as a standalone api or agent process. Note that the in-memory (-backend-type=memory) backend repository is pointless when adagiod is configured as seperate api and agent processes. Instead use a remote backend for deployment scenarios such as this (currently only "etcd" is supported here).
 
 ```
 Usage: adagiod <api|agent> [OPTIONS]

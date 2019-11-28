@@ -16,7 +16,7 @@ func Test_Builder_Simple(t *testing.T) {
 		cSpec = &adagio.Node_Spec{
 			Name: "c",
 			Retry: map[string]*adagio.Node_Spec_Retry{
-				"fail": &adagio.Node_Spec_Retry{MaxAttempts: 2},
+				"fail": {MaxAttempts: 2},
 			},
 		}
 		dSpec = &adagio.Node_Spec{Name: "d"}

@@ -1,4 +1,9 @@
-//	package main
+// Package workflow
+//
+// The workflow package contains a helpful builder type which provides fluent style functions to construct a graph
+// and to execute the graph on a provided control plane client.
+//
+//  package main
 //
 //	import (
 //		"context"
@@ -39,10 +44,13 @@
 //		)
 //
 //		c.DependsOn(a)
-//		d.DependsOn(a, b)
+//		d.DependsOn(a)
+//		d.DependsOn(b)
 //		f.DependsOn(b)
-//		e.DependsOn(c, d)
-//		g.DependsOn(e, f)
+//		e.DependsOn(d)
+//		e.DependsOn(c)
+//		g.DependsOn(e)
+//		g.DependsOn(f)
 //
 //		return builder.Start(ctxt, client)
 //	}

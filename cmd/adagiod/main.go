@@ -26,6 +26,8 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Repository is a type which is both a control plane
+// and an agent repository implementation
 type Repository interface {
 	controlservice.Repository
 	agent.Repository

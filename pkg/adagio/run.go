@@ -15,6 +15,10 @@ var (
 	mu      sync.Mutex
 )
 
+// NewRun converts a graph specification into a new run instance
+// This is a convention and helper function for repository implementations to use to
+// correctly adapt a new graph spec into a run. It validates that the graph has
+// no cycles and initializes states, timestamps and IDs appropriately
 func NewRun(spec *GraphSpec) (run *Run, err error) {
 	func() {
 		mu.Lock()
@@ -40,6 +44,7 @@ func NewRun(spec *GraphSpec) (run *Run, err error) {
 	return
 }
 
+// GetNodeByName fetches a Node from the Run by name
 func (run *Run) GetNodeByName(name string) (*Node, error) {
 	for _, node := range run.Nodes {
 		if node.Spec.Name == name {
@@ -86,6 +91,8 @@ func setInitialNodeStates(graph *graph.Graph, nodes []*Node) error {
 	return nil
 }
 
+// GraphFrom takes a run and builds a *graph.Graph from it which contains
+// helpful functions to traversing the runs graph structure
 func GraphFrom(run *Run) *graph.Graph {
 	var (
 		graph  = graph.New()

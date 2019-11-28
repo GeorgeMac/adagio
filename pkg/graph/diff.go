@@ -7,6 +7,7 @@ import (
 	"github.com/kr/pretty"
 )
 
+// Diff returns a string slice of differences between graphs a and b
 func Diff(a, b *Graph) []string {
 	type graph struct {
 		nodes []string
@@ -17,7 +18,7 @@ func Diff(a, b *Graph) []string {
 		for src, eset := range g.forward {
 			dest.nodes = append(dest.nodes, fmt.Sprintf("%v", src))
 
-			for target, _ := range eset {
+			for target := range eset {
 				dest.edges = append(dest.edges, fmt.Sprintf("%v to %v", src, target))
 			}
 		}

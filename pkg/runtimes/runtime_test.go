@@ -44,19 +44,19 @@ func Test_Builder_Spec(t *testing.T) {
 				Name:    "happy path",
 				Runtime: "foo",
 				Metadata: map[string]*adagio.MetadataValue{
-					"adagio.arguments.foo.string_field": &adagio.MetadataValue{
+					"adagio.arguments.foo.string_field": {
 						Values: []string{"a_string"},
 					},
-					"adagio.arguments.foo.strings_field": &adagio.MetadataValue{
+					"adagio.arguments.foo.strings_field": {
 						Values: []string{"a", "b", "c"},
 					},
-					"adagio.arguments.foo.int64_field": &adagio.MetadataValue{
+					"adagio.arguments.foo.int64_field": {
 						Values: []string{"12345"},
 					},
-					"adagio.arguments.foo.time_field": &adagio.MetadataValue{
+					"adagio.arguments.foo.time_field": {
 						Values: []string{"2019-01-01T10:00:00.000000075Z"},
 					},
-					"adagio.arguments.foo.json_encoded_field": &adagio.MetadataValue{
+					"adagio.arguments.foo.json_encoded_field": {
 						Values: []string{`{"A":"foo","B":1234}`},
 					},
 				},
@@ -88,16 +88,16 @@ func Test_Builder_Spec(t *testing.T) {
 				Name:    "happy path - set argument from input",
 				Runtime: "foo",
 				Metadata: map[string]*adagio.MetadataValue{
-					"adagio.arguments.foo.string_field": &adagio.MetadataValue{
+					"adagio.arguments.foo.string_field": {
 						Values: []string{"a_string"},
 					},
-					"adagio.arguments.foo.strings_field": &adagio.MetadataValue{
+					"adagio.arguments.foo.strings_field": {
 						Values: []string{"a", "b", "c"},
 					},
-					"adagio.arguments.foo.time_field": &adagio.MetadataValue{
+					"adagio.arguments.foo.time_field": {
 						Values: []string{"2019-01-01T10:00:00.000000075Z"},
 					},
-					"adagio.inputs.foo.int64_field": &adagio.MetadataValue{
+					"adagio.inputs.foo.int64_field": {
 						Values: []string{"other_func"},
 					},
 				},
@@ -128,19 +128,19 @@ func Test_Builder_Parse(t *testing.T) {
 					Name:    "a",
 					Runtime: "foo",
 					Metadata: map[string]*adagio.MetadataValue{
-						"adagio.arguments.foo.string_field": &adagio.MetadataValue{
+						"adagio.arguments.foo.string_field": {
 							Values: []string{"a_string"},
 						},
-						"adagio.arguments.foo.strings_field": &adagio.MetadataValue{
+						"adagio.arguments.foo.strings_field": {
 							Values: []string{"a", "b", "c"},
 						},
-						"adagio.arguments.foo.int64_field": &adagio.MetadataValue{
+						"adagio.arguments.foo.int64_field": {
 							Values: []string{"12345"},
 						},
-						"adagio.arguments.foo.time_field": &adagio.MetadataValue{
+						"adagio.arguments.foo.time_field": {
 							Values: []string{"2019-07-10T10:00:00.000000050Z"},
 						},
-						"adagio.arguments.foo.json_field": &adagio.MetadataValue{
+						"adagio.arguments.foo.json_field": {
 							Values: []string{`{"a":"bar","b":2345}`},
 						},
 					},
@@ -212,19 +212,19 @@ func Test_Builder_Parse(t *testing.T) {
 					Name:    "a",
 					Runtime: "foo",
 					Metadata: map[string]*adagio.MetadataValue{
-						"adagio.arguments.foo.string_field": &adagio.MetadataValue{
+						"adagio.arguments.foo.string_field": {
 							Values: []string{"a_string"},
 						},
-						"adagio.arguments.foo.strings_field": &adagio.MetadataValue{
+						"adagio.arguments.foo.strings_field": {
 							Values: []string{"a", "b", "c"},
 						},
-						"adagio.arguments.foo.int64_field": &adagio.MetadataValue{
+						"adagio.arguments.foo.int64_field": {
 							Values: []string{"12345"},
 						},
-						"adagio.inputs.foo.time_field": &adagio.MetadataValue{
+						"adagio.inputs.foo.time_field": {
 							Values: []string{"other_func"},
 						},
-						"adagio.inputs.foo.json_field": &adagio.MetadataValue{
+						"adagio.inputs.foo.json_field": {
 							Values: []string{"other_json_func"},
 						},
 					},

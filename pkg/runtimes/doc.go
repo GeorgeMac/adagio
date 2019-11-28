@@ -1,4 +1,4 @@
-// The runtime package contains types which aid in the building of runtimes
+// Package runtime contains types which aid in the building of runtimes
 // and runtime calls which can be constructed and invoked by the agent types.
 //
 // The *Builder type aids in composing types which avoid having to do manual
