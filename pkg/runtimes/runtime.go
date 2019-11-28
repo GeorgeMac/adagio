@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -51,26 +52,26 @@ const (
 // and then invoking the desired behavior via Run
 type ParseRunner interface {
 	Parse(n *adagio.Node) error
-	Run() (*adagio.Result, error)
+	Run(ctx context.Context) (*adagio.Result, error)
 }
 
 // FunctionAdaptor is the type used to covert a ParseRunner
-// into a worker.Function compatable type
+// into a agent.Function compatable type
 type FunctionAdaptor struct {
 	runner ParseRunner
 }
 
 // Run calls Parse on the provided node and then invokes
 // Run on the underlying ParseRunner
-func (p FunctionAdaptor) Run(n *adagio.Node) (*adagio.Result, error) {
+func (p FunctionAdaptor) Run(ctx context.Context, n *adagio.Node) (*adagio.Result, error) {
 	if err := p.runner.Parse(n); err != nil {
 		return nil, err
 	}
 
-	return p.runner.Run()
+	return p.runner.Run(ctx)
 }
 
-// Function converts the provided ParseRunner into a worker.Function
+// Function converts the provided ParseRunner into a agent.Function
 // using the FunctionAdaptor wrapper type
 func Function(runner ParseRunner) FunctionAdaptor {
 	return FunctionAdaptor{runner}

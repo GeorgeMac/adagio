@@ -1,12 +1,12 @@
 // The runtime package contains types which aid in the building of runtimes
-// and runtime calls which can be constructed and invoked by the worker types.
+// and runtime calls which can be constructed and invoked by the agent types.
 //
 // The *Builder type aids in composing types which avoid having to do manual
 // parsing to and from metadata fields on adagio.Node types.
 //
 // The `runtime.Function()` is a handy function which takes a type with the behavior for
 // parsing an incoming node (`Parse(*adagio.Node) error`) and running the function once
-// parsed (`Run() (*adagio.Result, error)`) as separate calls and combines them in a worker.Function
+// parsed (`Run() (*adagio.Result, error)`) as separate calls and combines them in a agent.Function
 // compatible implementation.
 // This allows for a *runtime.Builder to be embedded into new Function definitions,
 // which can then take on the responsibility of the `Parse(node) error` call.
@@ -21,7 +21,7 @@
 //
 // package thing
 //
-// import "github.com/georgemac/adagio/pkg/worker"
+// import "github.com/georgemac/adagio/pkg/agent"
 //
 // const name = "thing"
 //
@@ -29,7 +29,7 @@
 //
 // func (r Runtime) Name() string { return name }
 //
-// func (r Runtime) BlankFunction() worker.Function {
+// func (r Runtime) BlankFunction() agent.Function {
 //     return runtime.Function(blankFunction())
 // }
 //

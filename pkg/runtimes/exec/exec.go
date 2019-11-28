@@ -1,11 +1,12 @@
 package exec
 
 import (
+	"context"
 	"os/exec"
 
 	"github.com/georgemac/adagio/pkg/adagio"
+	"github.com/georgemac/adagio/pkg/agent"
 	runtime "github.com/georgemac/adagio/pkg/runtimes"
-	"github.com/georgemac/adagio/pkg/worker"
 	"github.com/georgemac/adagio/pkg/workflow"
 )
 
@@ -15,9 +16,9 @@ var (
 	_ workflow.Function = (*Function)(nil)
 )
 
-// Runtime returns the exec package worker.Runtime
-func Runtime() worker.Runtime {
-	return worker.RuntimeFunc(name, func() worker.Function {
+// Runtime returns the exec package agent.Runtime
+func Runtime() agent.Runtime {
+	return agent.RuntimeFunc(name, func() agent.Function {
 		return runtime.Function(blankFunction())
 	})
 }
@@ -31,7 +32,7 @@ func blankFunction() *Function {
 	return c
 }
 
-// Function is a struct which implements the worker.Runtime
+// Function is a struct which implements the agent.Runtime
 // It executes the work for a provided node on a function to Run
 // and uses the os/exec package to invoke a subprocess
 type Function struct {
@@ -50,7 +51,7 @@ func NewFunction(command string, args ...string) *Function {
 
 // Run spawns a subprocess for the desired command and returns the combined
 // output writer as an adagio Result output slice of bytes
-func (fn *Function) Run() (*adagio.Result, error) {
+func (fn *Function) Run(context.Context) (*adagio.Result, error) {
 	data, err := exec.Command(fn.Command, fn.Args...).CombinedOutput()
 	if err != nil {
 		return nil, err

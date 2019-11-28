@@ -1,4 +1,4 @@
-package worker
+package agent
 
 type Option func(*Pool)
 
@@ -10,7 +10,7 @@ func (o Options) Apply(p *Pool) {
 	}
 }
 
-func WithWorkerCount(count int) Option {
+func WithAgentCount(count int) Option {
 	return func(p *Pool) {
 		p.size = count
 	}

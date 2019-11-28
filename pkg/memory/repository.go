@@ -1,21 +1,22 @@
 package memory
 
 import (
+	"context"
 	"math"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
+	"github.com/georgemac/adagio/pkg/agent"
 	"github.com/georgemac/adagio/pkg/graph"
 	"github.com/georgemac/adagio/pkg/service/controlplane"
-	"github.com/georgemac/adagio/pkg/worker"
 	"github.com/pkg/errors"
 )
 
 var (
-	// compile time check to ensure Repository is a worker.Repository
-	_ worker.Repository       = (*Repository)(nil)
+	// compile time check to ensure Repository is a agent.Repository
+	_ agent.Repository        = (*Repository)(nil)
 	_ controlplane.Repository = (*Repository)(nil)
 )
 
@@ -55,7 +56,7 @@ func New() *Repository {
 	}
 }
 
-func (r *Repository) Stats() (*adagio.Stats, error) {
+func (r *Repository) Stats(context.Context) (*adagio.Stats, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -82,7 +83,7 @@ func (r *Repository) Stats() (*adagio.Stats, error) {
 	}, nil
 }
 
-func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err error) {
+func (r *Repository) StartRun(_ context.Context, spec *adagio.GraphSpec) (run *adagio.Run, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -110,7 +111,7 @@ func (r *Repository) StartRun(spec *adagio.GraphSpec) (run *adagio.Run, err erro
 	return
 }
 
-func (r *Repository) InspectRun(id string) (*adagio.Run, error) {
+func (r *Repository) InspectRun(_ context.Context, id string) (*adagio.Run, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -143,7 +144,7 @@ func (r *Repository) InspectRun(id string) (*adagio.Run, error) {
 	return run, nil
 }
 
-func (r *Repository) ListAgents() (agents []*adagio.Agent, err error) {
+func (r *Repository) ListAgents(_ context.Context) (agents []*adagio.Agent, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -158,7 +159,7 @@ func (r *Repository) ListAgents() (agents []*adagio.Agent, err error) {
 	return
 }
 
-func (r *Repository) ListRuns(req controlplane.ListRequest) (runs []*adagio.Run, err error) {
+func (r *Repository) ListRuns(_ context.Context, req controlplane.ListRequest) (runs []*adagio.Run, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -224,7 +225,7 @@ func (r *Repository) ListRuns(req controlplane.ListRequest) (runs []*adagio.Run,
 	return
 }
 
-func (r *Repository) ClaimNode(runID, name string, claim *adagio.Claim) (*adagio.Node, bool, error) {
+func (r *Repository) ClaimNode(_ context.Context, runID, name string, claim *adagio.Claim) (*adagio.Node, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -270,7 +271,7 @@ func (r *Repository) notifyReady(run *adagio.Run, node *adagio.Node) {
 	}
 }
 
-func (r *Repository) FinishNode(runID, name string, result *adagio.Node_Result, claim *adagio.Claim) error {
+func (r *Repository) FinishNode(_ context.Context, runID, name string, result *adagio.Node_Result, claim *adagio.Claim) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -374,7 +375,7 @@ func (r *Repository) handleFailure(state runState, node *adagio.Node, src map[gr
 	return nil
 }
 
-func (r *Repository) Subscribe(agent *adagio.Agent, events chan<- *adagio.Event, types ...adagio.Event_Type) error {
+func (r *Repository) Subscribe(_ context.Context, agent *adagio.Agent, events chan<- *adagio.Event, types ...adagio.Event_Type) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -400,7 +401,7 @@ func (r *Repository) Subscribe(agent *adagio.Agent, events chan<- *adagio.Event,
 	return nil
 }
 
-func (r *Repository) UnsubscribeAll(agent *adagio.Agent, events chan<- *adagio.Event) error {
+func (r *Repository) UnsubscribeAll(_ context.Context, agent *adagio.Agent, events chan<- *adagio.Event) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

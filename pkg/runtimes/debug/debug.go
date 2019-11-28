@@ -1,6 +1,7 @@
 package debug
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -8,8 +9,8 @@ import (
 	"time"
 
 	"github.com/georgemac/adagio/pkg/adagio"
+	"github.com/georgemac/adagio/pkg/agent"
 	runtime "github.com/georgemac/adagio/pkg/runtimes"
-	"github.com/georgemac/adagio/pkg/worker"
 	"github.com/georgemac/adagio/pkg/workflow"
 )
 
@@ -20,8 +21,8 @@ var (
 )
 
 // Runtime returns the debub packages runtime
-func Runtime() worker.Runtime {
-	return worker.RuntimeFunc(name, func() worker.Function {
+func Runtime() agent.Runtime {
+	return agent.RuntimeFunc(name, func() agent.Function {
 		return runtime.Function(blankFunction())
 	})
 }
@@ -125,7 +126,7 @@ func With(chances ...ChanceCondition) Option {
 // then loops over any provided chance conditions.
 // Given no chance condinition is met it returns the configured
 // adagio result conclusion
-func (function *Function) Run() (*adagio.Result, error) {
+func (function *Function) Run(ctx context.Context) (*adagio.Result, error) {
 	time.Sleep(time.Duration(function.Sleep))
 
 	for _, c := range function.Chances {
