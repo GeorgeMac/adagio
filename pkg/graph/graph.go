@@ -5,20 +5,28 @@ import (
 )
 
 var (
+	// ErrDuplicateNode is returned when a node is attempted to
+	// be inserted when it is already present
 	ErrDuplicateNode = errors.New("node already exists in graph")
-	ErrMissingNode   = errors.New("node is not present in graph")
+	// ErrMissingNode is returned when a node is reference which
+	// does not exist within the graph
+	ErrMissingNode = errors.New("node is not present in graph")
 )
 
 type (
+	// Node is a vertex in a graph
 	Node    interface{}
 	nodeSet map[Node]struct{}
 	edgeSet map[Node]nodeSet
 )
 
+// Graph is a graph datastructure which contains nodes with directed
+// edges between them
 type Graph struct {
 	forward, reverse edgeSet
 }
 
+// New constructs a new graph from a set of Nodes
 func New(nodes ...Node) *Graph {
 	graph := &Graph{
 		forward: edgeSet{},
@@ -47,6 +55,7 @@ func (g *Graph) initializeIfEmpty() {
 	}
 }
 
+// AddNodes adds the provided nodes to the graph
 func (g *Graph) AddNodes(nodes ...Node) error {
 	g.initializeIfEmpty()
 
@@ -63,6 +72,8 @@ func (g *Graph) AddNodes(nodes ...Node) error {
 	return nil
 }
 
+// IsRoot returns true if the node has no incoming edges
+// within the graph
 func (g *Graph) IsRoot(n Node) (bool, error) {
 	if !g.reverse.present(n) {
 		return false, wrapMissingErr(n)
@@ -71,6 +82,8 @@ func (g *Graph) IsRoot(n Node) (bool, error) {
 	return len(g.reverse[n]) == 0, nil
 }
 
+// IsLeaf returns true if the node has no outgoing edges
+// within the graph
 func (g *Graph) IsLeaf(n Node) (bool, error) {
 	if !g.forward.present(n) {
 		return false, wrapMissingErr(n)
@@ -79,6 +92,8 @@ func (g *Graph) IsLeaf(n Node) (bool, error) {
 	return len(g.forward[n]) == 0, nil
 }
 
+// Outgoing returns a set of nodes which are directed to from
+// the provided node
 func (g *Graph) Outgoing(n Node) (nodes map[Node]struct{}, err error) {
 	if !g.forward.present(n) {
 		return nil, wrapMissingErr(n)
@@ -87,6 +102,8 @@ func (g *Graph) Outgoing(n Node) (nodes map[Node]struct{}, err error) {
 	return g.forward[n].clone(), nil
 }
 
+// Incoming returns a set of nodes which are directed from the
+// provided node
 func (g *Graph) Incoming(n Node) (nodes map[Node]struct{}, err error) {
 	if !g.reverse.present(n) {
 		return nil, wrapMissingErr(n)
@@ -95,6 +112,7 @@ func (g *Graph) Incoming(n Node) (nodes map[Node]struct{}, err error) {
 	return g.reverse[n].clone(), nil
 }
 
+// Connect constructs and edge from one node to another
 func (g *Graph) Connect(from, to Node) error {
 	g.initializeIfEmpty()
 
@@ -105,6 +123,8 @@ func (g *Graph) Connect(from, to Node) error {
 	return g.reverse.connect(to, from)
 }
 
+// Cycles detects and returns any cycles found within
+// the graph
 func (g *Graph) Cycles() (cycles [][]Node) {
 	for _, cc := range g.StronglyConnectedComponents() {
 		if len(cc) > 1 {
@@ -115,6 +135,8 @@ func (g *Graph) Cycles() (cycles [][]Node) {
 	return
 }
 
+// StronglyConnectedComponents returns the set of strongly connected
+// components within the graph
 func (g *Graph) StronglyConnectedComponents() (components [][]Node) {
 	var (
 		sorted = g.TopologicalSort()
@@ -130,18 +152,24 @@ func (g *Graph) StronglyConnectedComponents() (components [][]Node) {
 	return
 }
 
+// TopologicalSort returns the set of nodes within the graph topologically
+// sorted
 func (g *Graph) TopologicalSort() []Node {
 	return reverse(g.dfsForward())
 }
 
+// VisitFunc is a function which takes a Node and returns an error
 type VisitFunc func(Node) error
 
+// Walk calls each visit func on each node in depth first order
 func (g *Graph) Walk(fn VisitFunc) {
 	for _, node := range g.dfsForward() {
 		fn(node)
 	}
 }
 
+// WalkFrom traverses the outgoing nodes to the leaves of the graph
+// from the provided node
 func (g *Graph) WalkFrom(node Node, fn VisitFunc) error {
 	var (
 		set           = g.forward.clone()
@@ -253,10 +281,10 @@ func (e edgeSet) remove(n Node) (set nodeSet, ok bool) {
 	return
 }
 
-func (s edgeSet) clone() edgeSet {
+func (e edgeSet) clone() edgeSet {
 	dest := edgeSet{}
-	for n, e := range s {
-		dest[n] = e
+	for n, edge := range e {
+		dest[n] = edge
 	}
 
 	return dest

@@ -12,11 +12,13 @@ import (
 )
 
 type (
+	// Result is a printing package simplified representation of an adagio result
 	Result struct {
 		Conclusion string
 		Output     string
 	}
 
+	// Node is a printing package simplified representation of an adagio node
 	Node struct {
 		Name       string
 		Runtime    string
@@ -28,6 +30,7 @@ type (
 		Inputs     map[string]string
 	}
 
+	// Run is a printing package simplified representation of an adagio run
 	Run struct {
 		ID        string
 		CreatedAt time.Time
@@ -95,6 +98,7 @@ func PBRunToRun(pbrun *adagio.Run) (Run, error) {
 	return run, nil
 }
 
+// Spew is a formatter which uses gospew to format the run
 func Spew(pbrun *adagio.Run) (fmt.Formatter, error) {
 	run, err := PBRunToRun(pbrun)
 	if err != nil {
@@ -104,6 +108,7 @@ func Spew(pbrun *adagio.Run) (fmt.Formatter, error) {
 	return spew.NewFormatter(run), nil
 }
 
+// Pretty is a formatter which used pretty to format the run
 func Pretty(pbrun *adagio.Run) (fmt.Formatter, error) {
 	run, err := PBRunToRun(pbrun)
 	if err != nil {

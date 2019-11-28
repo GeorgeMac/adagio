@@ -30,6 +30,8 @@ type (
 	}
 )
 
+// Repository is an in-memory implementation of the adagio Repository interfaces
+// It adheres to the repository test harness
 type Repository struct {
 	agents map[string]*adagio.Agent
 	runs   map[string]runState
@@ -44,6 +46,7 @@ type Repository struct {
 	now func() time.Time
 }
 
+// New constructs and configures a new in memory repository
 func New() *Repository {
 	return &Repository{
 		agents: map[string]*adagio.Agent{},
@@ -56,6 +59,7 @@ func New() *Repository {
 	}
 }
 
+// Stats returns counts of runs and nodes in their respective states
 func (r *Repository) Stats(context.Context) (*adagio.Stats, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -83,6 +87,7 @@ func (r *Repository) Stats(context.Context) (*adagio.Stats, error) {
 	}, nil
 }
 
+// StartRun instantiates a run from a provided graph specification
 func (r *Repository) StartRun(_ context.Context, spec *adagio.GraphSpec) (run *adagio.Run, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -111,6 +116,7 @@ func (r *Repository) StartRun(_ context.Context, spec *adagio.GraphSpec) (run *a
 	return
 }
 
+// InspectRun returns a run for the provided run ID
 func (r *Repository) InspectRun(_ context.Context, id string) (*adagio.Run, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -144,6 +150,7 @@ func (r *Repository) InspectRun(_ context.Context, id string) (*adagio.Run, erro
 	return run, nil
 }
 
+// ListAgents returns a set of subscribed agents
 func (r *Repository) ListAgents(_ context.Context) (agents []*adagio.Agent, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -159,6 +166,7 @@ func (r *Repository) ListAgents(_ context.Context) (agents []*adagio.Agent, err 
 	return
 }
 
+// ListRuns returns a list of runs in descending order based on a set of provided predicates
 func (r *Repository) ListRuns(_ context.Context, req controlplane.ListRequest) (runs []*adagio.Run, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -225,6 +233,7 @@ func (r *Repository) ListRuns(_ context.Context, req controlplane.ListRequest) (
 	return
 }
 
+// ClaimNode attempts to make a claim for a node
 func (r *Repository) ClaimNode(_ context.Context, runID, name string, claim *adagio.Claim) (*adagio.Node, bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -271,6 +280,7 @@ func (r *Repository) notifyReady(run *adagio.Run, node *adagio.Node) {
 	}
 }
 
+// FinishNode reports the result of a node run and readies any eligible outgoing nodes
 func (r *Repository) FinishNode(_ context.Context, runID, name string, result *adagio.Node_Result, claim *adagio.Claim) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -375,6 +385,7 @@ func (r *Repository) handleFailure(state runState, node *adagio.Node, src map[gr
 	return nil
 }
 
+// Subscribe registers the provided channel to listen for the defined event types
 func (r *Repository) Subscribe(_ context.Context, agent *adagio.Agent, events chan<- *adagio.Event, types ...adagio.Event_Type) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -401,6 +412,7 @@ func (r *Repository) Subscribe(_ context.Context, agent *adagio.Agent, events ch
 	return nil
 }
 
+// UnsubscribeAll unsubscribes the channel for all event types
 func (r *Repository) UnsubscribeAll(_ context.Context, agent *adagio.Agent, events chan<- *adagio.Event) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

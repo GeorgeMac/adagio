@@ -11,6 +11,9 @@ import (
 
 var _ controlplane.ControlPlaneServer = (*Service)(nil)
 
+// Repository is an implementation of a backing repository
+// which can report on the status of runs, list runs and agents
+// and start new runs given a graph specification
 type Repository interface {
 	Stats(context.Context) (*adagio.Stats, error)
 	StartRun(context.Context, *adagio.GraphSpec) (*adagio.Run, error)
@@ -19,16 +22,21 @@ type Repository interface {
 	ListAgents(context.Context) ([]*adagio.Agent, error)
 }
 
+// ListRequest is a request structure with predicates used to
+// retrieve a list of runs
 type ListRequest struct {
 	Start  *time.Time
 	Finish *time.Time
 	Limit  *uint64
 }
 
+// Service is an adagio control plane server implementation which
+// adapts call to a Repository implementation
 type Service struct {
 	repo Repository
 }
 
+// New constructs and configures a new Service instance
 func New(repo Repository) *Service {
 	s := &Service{
 		repo: repo,
@@ -37,6 +45,7 @@ func New(repo Repository) *Service {
 	return s
 }
 
+// Stats adapts a controle plane stats request into a repository Stats call and returns the result
 func (s *Service) Stats(ctx context.Context, req *controlplane.StatsRequest) (*controlplane.StatsResponse, error) {
 	stats, err := s.repo.Stats(ctx)
 	if err != nil {
@@ -46,6 +55,7 @@ func (s *Service) Stats(ctx context.Context, req *controlplane.StatsRequest) (*c
 	return &controlplane.StatsResponse{Stats: stats}, nil
 }
 
+// Start adapts a control plane start request into a repository Start Run call and returns the result
 func (s *Service) Start(ctx context.Context, req *controlplane.StartRequest) (*controlplane.StartResponse, error) {
 	run, err := s.repo.StartRun(ctx, req.Spec)
 	if err != nil {
@@ -55,6 +65,7 @@ func (s *Service) Start(ctx context.Context, req *controlplane.StartRequest) (*c
 	return &controlplane.StartResponse{Run: run}, nil
 }
 
+// Inspect adapts a control plane inspect request into a repository InspectRun call and returns the result
 func (s *Service) Inspect(ctx context.Context, req *controlplane.InspectRequest) (*controlplane.InspectResponse, error) {
 	run, err := s.repo.InspectRun(ctx, req.Id)
 	if err != nil {
@@ -64,6 +75,7 @@ func (s *Service) Inspect(ctx context.Context, req *controlplane.InspectRequest)
 	return &controlplane.InspectResponse{Run: run}, nil
 }
 
+// ListRuns adapts a control plane list request into a ListRuns call and returns the result
 func (s *Service) ListRuns(ctx context.Context, r *controlplane.ListRequest) (*controlplane.ListRunsResponse, error) {
 	req := ListRequest{
 		Limit: &r.Limit,
@@ -87,6 +99,7 @@ func (s *Service) ListRuns(ctx context.Context, r *controlplane.ListRequest) (*c
 	return &controlplane.ListRunsResponse{Runs: runs}, nil
 }
 
+// ListAgents adapts a control plane ListRequest into a repository ListAgents call and returns the result
 func (s *Service) ListAgents(ctx context.Context, _ *controlplane.ListRequest) (*controlplane.ListAgentsResponse, error) {
 	agents, err := s.repo.ListAgents(ctx)
 	if err != nil {

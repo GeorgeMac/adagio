@@ -15,7 +15,7 @@ import (
 
 var (
 	// ErrRuntimeDoesNotExist is returned when a node is claimed with an
-	// unkown runtime type
+	// unknown runtime type
 	ErrRuntimeDoesNotExist = errors.New("runtime does not exist")
 )
 

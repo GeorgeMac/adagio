@@ -1,4 +1,4 @@
-// package etcd contains types which enable etcd as a repository backend for
+// Package etcd contains types which enable etcd as a repository backend for
 // the adagio workflow engine.
 //
 // Keyspace Design (etcd internals)

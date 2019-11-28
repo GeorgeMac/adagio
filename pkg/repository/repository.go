@@ -44,6 +44,7 @@ var (
 
 	when = time.Date(2019, 5, 24, 8, 2, 0, 0, time.UTC)
 
+	// ExampleGraph is an example of a graph specification
 	ExampleGraph = &adagio.GraphSpec{
 		Nodes: []*adagio.Node_Spec{
 			a,
@@ -67,21 +68,33 @@ var (
 	}
 )
 
+// Repository is a combination of the controlplane and agent repository types
 type Repository interface {
 	controlplane.Repository
 	agent.Repository
 }
 
+// Orphaner is a type which can trigger the orphaning of a node based on a claim
 type Orphaner interface {
 	Orphan(claim *adagio.Claim)
 }
 
+// OrphanFunc is a function which can be used as an Orphaner
 type OrphanFunc func(*adagio.Claim)
 
+// Orphan delegates to the underlying OrphanFunc
 func (o OrphanFunc) Orphan(c *adagio.Claim) { o(c) }
 
+// Constructor is a function which constructs a repository and orphaner when
+// provded a function which returns a time (now)
 type Constructor func(func() time.Time) (Repository, Orphaner)
 
+// TestHarness is a test suite which a repository must pass in order to be deemed
+// appropriate as an adagio repository.
+//
+// It runs a number of import scenarios against the repository implementation which include
+// attempts to make concurrent claims, attempts to finish node appropriately, attempts to handle
+// orphaned nodes and so on.
 func TestHarness(t *testing.T, repoFn Constructor) {
 	t.Helper()
 
@@ -221,7 +234,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				RunStatus: adagio.Run_COMPLETED,
 			},
 		} {
-			layer.Exec(t, ctx)
+			layer.Exec(ctx, t)
 		}
 
 		t.Run("the run is listed", func(t *testing.T) {
@@ -335,7 +348,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				RunStatus: adagio.Run_COMPLETED,
 			},
 		} {
-			layer.Exec(t, ctx)
+			layer.Exec(ctx, t)
 		}
 
 		t.Run("the run is listed", func(t *testing.T) {
@@ -497,7 +510,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				RunStatus: adagio.Run_COMPLETED,
 			},
 		} {
-			layer.Exec(t, ctx)
+			layer.Exec(ctx, t)
 		}
 
 		t.Run("the run is listed", func(t *testing.T) {
@@ -625,7 +638,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 				RunStatus: adagio.Run_COMPLETED,
 			},
 		} {
-			layer.Exec(t, ctx)
+			layer.Exec(ctx, t)
 		}
 
 		t.Run("the run is listed", func(t *testing.T) {
@@ -685,7 +698,7 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 		var claims map[string]*adagio.Claim
 		t.Run("an initial claim is made", func(t *testing.T) {
 			// ensure node can initially be claimed
-			claims = canClaim(t, ctx, repo, run, map[string]*adagio.Node{"a": running(a, nil)})
+			claims = canClaim(ctx, t, repo, run, map[string]*adagio.Node{"a": running(a, nil)})
 		})
 
 		// orphan claim for node "a" from run
@@ -701,11 +714,11 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 
 		t.Run("the orphaned node", func(t *testing.T) {
 			// ensure orphaned node can be claimed again and has no results yet
-			claims = canClaim(t, ctx, repo, run, map[string]*adagio.Node{"a": running(a, nil)})
+			claims = canClaim(ctx, t, repo, run, map[string]*adagio.Node{"a": running(a, nil)})
 		})
 
 		// can error the node
-		canFinish(t, ctx, repo, run, map[string]adagio.Node_Result_Conclusion{
+		canFinish(ctx, t, repo, run, map[string]adagio.Node_Result_Conclusion{
 			"a": adagio.Node_Result_ERROR,
 		}, claims)
 
@@ -801,6 +814,8 @@ func TestHarness(t *testing.T, repoFn Constructor) {
 	})
 }
 
+// TestLayer is used by the TestHarness to run a prebaked scenario of calls (claims and finishes)
+// and expect a state of the world
 type TestLayer struct {
 	Name        string
 	Repository  Repository
@@ -812,7 +827,8 @@ type TestLayer struct {
 	RunStatus   adagio.Run_Status
 }
 
-func (l *TestLayer) Exec(t *testing.T, ctx context.Context) {
+// Exec executes the test layer against the provided testing T given a context
+func (l *TestLayer) Exec(ctx context.Context, t *testing.T) {
 	t.Helper()
 
 	var (
@@ -831,12 +847,12 @@ func (l *TestLayer) Exec(t *testing.T, ctx context.Context) {
 
 	var claims map[string]*adagio.Claim
 	t.Run(l.Name, func(t *testing.T) {
-		canNotClaim(t, ctx, l.Repository, l.Run, l.Unclaimable...)
+		canNotClaim(ctx, t, l.Repository, l.Run, l.Unclaimable...)
 
-		claims = canClaim(t, ctx, l.Repository, l.Run, l.Claimable)
+		claims = canClaim(ctx, t, l.Repository, l.Run, l.Claimable)
 	})
 
-	canFinish(t, ctx, l.Repository, l.Run, l.Finish, claims)
+	canFinish(ctx, t, l.Repository, l.Run, l.Finish, claims)
 
 	t.Run(fmt.Sprintf("the run is reported with a status of %q", l.RunStatus), func(t *testing.T) {
 		// check run reports expected status
@@ -875,7 +891,7 @@ func (l *TestLayer) Exec(t *testing.T, ctx context.Context) {
 	})
 }
 
-func canNotClaim(t *testing.T, ctx context.Context, repo Repository, run *adagio.Run, names ...string) {
+func canNotClaim(ctx context.Context, t *testing.T, repo Repository, run *adagio.Run, names ...string) {
 	t.Helper()
 
 	t.Run("can not claim", func(t *testing.T) {
@@ -894,7 +910,7 @@ func canNotClaim(t *testing.T, ctx context.Context, repo Repository, run *adagio
 	})
 }
 
-func canClaim(t *testing.T, ctx context.Context, repo Repository, run *adagio.Run, nodes map[string]*adagio.Node) (claims map[string]*adagio.Claim) {
+func canClaim(ctx context.Context, t *testing.T, repo Repository, run *adagio.Run, nodes map[string]*adagio.Node) (claims map[string]*adagio.Claim) {
 	t.Helper()
 
 	var mu sync.Mutex
@@ -908,7 +924,7 @@ func canClaim(t *testing.T, ctx context.Context, repo Repository, run *adagio.Ru
 				func(name string, node *adagio.Node) {
 					t.Parallel()
 
-					claimed, claim := attemptNClaims(t, ctx, repo, run, name, 5)
+					claimed, claim := attemptNClaims(ctx, t, repo, run, name, 5)
 					node.Claim = claim
 
 					t.Run("and it returns the correct node", func(t *testing.T) {
@@ -926,7 +942,7 @@ func canClaim(t *testing.T, ctx context.Context, repo Repository, run *adagio.Ru
 	return
 }
 
-func canFinish(t *testing.T, ctx context.Context, repo Repository, run *adagio.Run, names map[string]adagio.Node_Result_Conclusion, claims map[string]*adagio.Claim) {
+func canFinish(ctx context.Context, t *testing.T, repo Repository, run *adagio.Run, names map[string]adagio.Node_Result_Conclusion, claims map[string]*adagio.Claim) {
 	t.Helper()
 
 	t.Run("can finish", func(t *testing.T) {
@@ -948,7 +964,7 @@ func canFinish(t *testing.T, ctx context.Context, repo Repository, run *adagio.R
 	})
 }
 
-func attemptNClaims(t *testing.T, ctx context.Context, repo Repository, run *adagio.Run, name string, n int) (node *adagio.Node, claim *adagio.Claim) {
+func attemptNClaims(ctx context.Context, t *testing.T, repo Repository, run *adagio.Run, name string, n int) (node *adagio.Node, claim *adagio.Claim) {
 	t.Helper()
 
 	t.Run("only one successful claim is made", func(t *testing.T) {

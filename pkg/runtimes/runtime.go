@@ -90,8 +90,8 @@ func NewBuilder(name string) *Builder {
 }
 
 // Name returns the name of the runtime being built
-func (p *Builder) Name() string {
-	return p.name
+func (b *Builder) Name() string {
+	return b.name
 }
 
 // SetArgumentFromInput configures the argument to derives its value from
@@ -109,15 +109,15 @@ func (b *Builder) SetArgumentFromInput(argument, name string) error {
 
 // NewSpec constructs a Node_Spec based on the current state
 // of the builders arguments
-func (p *Builder) NewSpec(name string) (*adagio.Node_Spec, error) {
+func (b *Builder) NewSpec(name string) (*adagio.Node_Spec, error) {
 	spec := &adagio.Node_Spec{
 		Name:     name,
-		Runtime:  p.name,
+		Runtime:  b.name,
 		Metadata: map[string]*adagio.MetadataValue{},
 	}
 
-	for _, argument := range p.arguments {
-		if err := argument.addTo(p.name, spec); err != nil {
+	for _, argument := range b.arguments {
+		if err := argument.addTo(b.name, spec); err != nil {
 			return nil, err
 		}
 	}
@@ -127,9 +127,9 @@ func (p *Builder) NewSpec(name string) (*adagio.Node_Spec, error) {
 
 // Parse parses the state from a node into the targets
 // set on the builders arguments
-func (p *Builder) Parse(node *adagio.Node) error {
-	for _, argument := range p.arguments {
-		if err := argument.parseNode(p.name, node); err != nil {
+func (b *Builder) Parse(node *adagio.Node) error {
+	for _, argument := range b.arguments {
+		if err := argument.parseNode(b.name, node); err != nil {
 			return err
 		}
 	}
@@ -140,7 +140,7 @@ func (p *Builder) Parse(node *adagio.Node) error {
 // String configures a string argument which when call with a string pointer
 // will set the pointer on calls to builder.Parse() and read the value
 // at the end of the pointer on calls to builder.NewSpec()
-func (s *Builder) String(v *string, name string, required bool, defaultValue string) {
+func (b *Builder) String(v *string, name string, required bool, defaultValue string) {
 	argument := newArgument(name, StringArgumentType, required, []string{defaultValue})
 	argument.asMetadata = func() ([]string, error) {
 		if v == nil {
@@ -164,13 +164,13 @@ func (s *Builder) String(v *string, name string, required bool, defaultValue str
 		return nil
 	}
 
-	s.arguments[name] = argument
+	b.arguments[name] = argument
 }
 
 // Strings configures a string slice argument which when call with a string slice pointer
 // will set the pointer on calls to builder.Parse() and read the value
 // at the end of the pointer on calls to builder.NewSpec()
-func (s *Builder) Strings(v *[]string, name string, required bool, defaultValues ...string) {
+func (b *Builder) Strings(v *[]string, name string, required bool, defaultValues ...string) {
 	argument := newArgument(name, StringsArgumentType, required, defaultValues)
 	argument.asMetadata = func() ([]string, error) {
 		if v == nil {
@@ -190,13 +190,13 @@ func (s *Builder) Strings(v *[]string, name string, required bool, defaultValues
 		return nil
 	}
 
-	s.arguments[name] = argument
+	b.arguments[name] = argument
 }
 
 // Int64 configures an int64 argument which will set the pointer on calls
 // to builder.Parse() and read the value at the end of the pointer
 // on calls to builder.NewSpec()
-func (s *Builder) Int64(v *int64, name string, required bool, defaultValue int64) {
+func (b *Builder) Int64(v *int64, name string, required bool, defaultValue int64) {
 	argument := newArgument(name, Int64ArgumentType, required, []string{fmt.Sprintf("%d", defaultValue)})
 	argument.asMetadata = func() ([]string, error) {
 		if v == nil {
@@ -220,13 +220,13 @@ func (s *Builder) Int64(v *int64, name string, required bool, defaultValue int64
 		return err
 	}
 
-	s.arguments[name] = argument
+	b.arguments[name] = argument
 }
 
 // Time configures a time argument which when call with a int64 pointer
 // will set the pointer on calls to builder.Parse() and read the value
 // at the end of the pointer on calls to builder.NewSpec()
-func (s *Builder) Time(v *time.Time, name string, required bool, defaultValue time.Time) {
+func (b *Builder) Time(v *time.Time, name string, required bool, defaultValue time.Time) {
 	argument := newArgument(name, TimeArgumentType, required, []string{defaultValue.Format(time.RFC3339Nano)})
 	argument.asMetadata = func() ([]string, error) {
 		if v == nil {
@@ -250,7 +250,7 @@ func (s *Builder) Time(v *time.Time, name string, required bool, defaultValue ti
 		return err
 	}
 
-	s.arguments[name] = argument
+	b.arguments[name] = argument
 }
 
 // JSON configures an argument which should be called with a pointer to
@@ -258,7 +258,7 @@ func (s *Builder) Time(v *time.Time, name string, required bool, defaultValue ti
 // It will set the pointer on calls to builder.Parse() by calling unmarshal
 // on the pointer and read the value at the end of the pointer and marshal
 // it on calls to builder.NewSpec()
-func (s *Builder) JSON(v interface{}, name string, required bool) {
+func (b *Builder) JSON(v interface{}, name string, required bool) {
 	argument := newArgument(name, JSONArgumentType, required, []string{"{}"})
 	argument.asMetadata = func() ([]string, error) {
 		if v == nil {
@@ -285,7 +285,7 @@ func (s *Builder) JSON(v interface{}, name string, required bool) {
 		return json.Unmarshal([]byte(vs[0]), v)
 	}
 
-	s.arguments[name] = argument
+	b.arguments[name] = argument
 }
 
 // Argument is a structure which contains the properties

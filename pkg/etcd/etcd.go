@@ -35,6 +35,10 @@ const (
 	nodesPrefix  = "nodes/"
 )
 
+// Repository is the etcd backed implementation of an adagio Repository type (control plane and agent)
+// It facilitates a distributed set of agents and control plane consumers using etcd as the store
+// and etcd v3 transactions to ensure a consistent behavior
+// It adheres to the repository test harness
 type Repository struct {
 	kv      clientv3.KV
 	watcher clientv3.Watcher
@@ -52,6 +56,8 @@ type Repository struct {
 	leaseMu sync.Mutex
 }
 
+// New constructs and configure a new repository service from the provided etcd client
+// and a set of function options
 func New(kv clientv3.KV, watcher clientv3.Watcher, leaser clientv3.Lease, opts ...Option) *Repository {
 	r := &Repository{
 		kv:            kv,
@@ -76,6 +82,7 @@ func New(kv clientv3.KV, watcher clientv3.Watcher, leaser clientv3.Lease, opts .
 	return r
 }
 
+// Stats returns the state of world represented as counts within the etcd database
 func (r *Repository) Stats(ctx context.Context) (*adagio.Stats, error) {
 	stats := &adagio.Stats{
 		NodeCounts: &adagio.Stats_NodeCounts{},
@@ -116,6 +123,8 @@ func (r *Repository) Stats(ctx context.Context) (*adagio.Stats, error) {
 	return stats, nil
 }
 
+// StartRun takes a graph specification and instantiates it within etcd an returns the resulting Run
+// representation
 func (r *Repository) StartRun(ctx context.Context, spec *adagio.GraphSpec) (run *adagio.Run, err error) {
 	run, err = adagio.NewRun(spec)
 	if err != nil {
@@ -168,10 +177,12 @@ func (r *Repository) StartRun(ctx context.Context, spec *adagio.GraphSpec) (run 
 	return
 }
 
+// InspectRun takes an ID and returns the associated Run if found within etcd
 func (r *Repository) InspectRun(ctx context.Context, id string) (*adagio.Run, error) {
 	return r.getRun(ctx, id)
 }
 
+// ListAgents returns at agents recorded within etcd at the time of the call
 func (r *Repository) ListAgents(ctx context.Context) (agents []*adagio.Agent, err error) {
 	resp, err := r.kv.Get(ctx, agentsPrefix, clientv3.WithPrefix())
 	if err != nil {
@@ -190,6 +201,10 @@ func (r *Repository) ListAgents(ctx context.Context) (agents []*adagio.Agent, er
 	return
 }
 
+// ListRuns returns a list of runs given a set of predicates
+// Given no start time is provided now is assumed
+// Given no finish time is provided epoch is assumed
+// Given no limit is provided all runs are returned
 func (r *Repository) ListRuns(ctx context.Context, req controlplane.ListRequest) (runs []*adagio.Run, err error) {
 	var (
 		opts = []clientv3.OpOption{clientv3.WithPrefix()}
@@ -251,6 +266,8 @@ func (r *Repository) ListRuns(ctx context.Context, req controlplane.ListRequest)
 	return
 }
 
+// ClaimNode attempts to claim a node identified by name for a specified run ID and providing a unique claim
+// Given the node is found and the claim is successful the node is returned and the claimed boolean with be true
 func (r *Repository) ClaimNode(ctx context.Context, runID, name string, claim *adagio.Claim) (node *adagio.Node, claimed bool, err error) {
 	run, err := r.getRun(ctx, runID)
 	if err != nil {
@@ -443,6 +460,7 @@ func (r *Repository) cancelLease(claimID string) {
 	r.leaseMu.Unlock()
 }
 
+// FinishNode records a result for a node identified by name for a specified run ID and given a unique and active claim
 func (r *Repository) FinishNode(ctx context.Context, runID, name string, result *adagio.Node_Result, claim *adagio.Claim) error {
 	run, err := r.getRun(ctx, runID)
 	if err != nil {
@@ -591,6 +609,8 @@ func (r *Repository) handleFailure(ctx context.Context, run *adagio.Run, node *a
 	return cmps, ops, nil
 }
 
+// Subscribe registers the agent as a subscriber and sends events regarding node readiness and orphanage
+// on the provided events channel
 func (r *Repository) Subscribe(ctx context.Context, a *adagio.Agent, events chan<- *adagio.Event, typ ...adagio.Event_Type) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -891,6 +911,7 @@ func (r *Repository) setInputs(ctx context.Context, run *adagio.Run, node *adagi
 	return nil
 }
 
+// UnsubscribeAll unsubscribes the provided agent and channel as a listener
 func (r *Repository) UnsubscribeAll(ctx context.Context, a *adagio.Agent, ch chan<- *adagio.Event) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
