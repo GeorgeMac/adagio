@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -14,7 +15,6 @@ import (
 	"github.com/georgemac/adagio/pkg/service/controlplane"
 	"github.com/kr/pretty"
 	"github.com/oklog/ulid/v2"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -903,7 +903,7 @@ func canNotClaim(ctx context.Context, t *testing.T, repo Repository, run *adagio
 					t.Parallel()
 
 					_, _, err := repo.ClaimNode(ctx, run.Id, name, newClaim())
-					assert.Equal(t, adagio.ErrNodeNotReady, errors.Cause(err))
+					assert.True(t, errors.Is(err, adagio.ErrNodeNotReady), "error unexpected", err)
 				}(name)
 			})
 		}

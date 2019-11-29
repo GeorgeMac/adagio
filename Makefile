@@ -41,7 +41,11 @@ protobuf-deps: ## Fetch protobuf dependencies
 
 .PHONY: docker-build
 docker-build: ## Build docker images
-	docker build -t georgemac/adagio:`git describe --always --dirty` -f docker/Dockerfile .
+	docker-compose build
+
+.PHONY: docker-publish
+docker-publish: ## Tag and Push images to docker hub
+	@hack/docker-publish.sh
 
 # Absolutely awesome: http://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
 .PHONY: help

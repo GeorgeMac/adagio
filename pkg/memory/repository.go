@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sort"
 	"sync"
@@ -11,7 +12,6 @@ import (
 	"github.com/georgemac/adagio/pkg/agent"
 	"github.com/georgemac/adagio/pkg/graph"
 	"github.com/georgemac/adagio/pkg/service/controlplane"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -245,11 +245,11 @@ func (r *Repository) ClaimNode(_ context.Context, runID, name string, claim *ada
 
 	node, ok := state.lookup[name]
 	if !ok {
-		return nil, false, errors.Wrapf(adagio.ErrMissingNode, "in-memory repository: node %q", name)
+		return nil, false, fmt.Errorf("in-memory repository: node %q: %w", name, adagio.ErrMissingNode)
 	}
 
 	if node.Status == adagio.Node_WAITING {
-		return nil, false, errors.Wrapf(adagio.ErrNodeNotReady, "in-memory repository: node %q", node)
+		return nil, false, fmt.Errorf("in-memory repository: node %q: %w", name, adagio.ErrNodeNotReady)
 	}
 
 	// node already claimed
@@ -301,7 +301,7 @@ func (r *Repository) FinishNode(_ context.Context, runID, name string, result *a
 
 	outgoing, err := state.graph.Outgoing(node)
 	if err != nil {
-		return errors.Wrapf(err, "finishing node %q", node)
+		return fmt.Errorf("finishing node %q: %w", node, err)
 	}
 
 	delete(r.claims, claim.Id)
@@ -331,7 +331,7 @@ func (r *Repository) handleSuccess(state runState, node *adagio.Node, outgoing m
 
 		incoming, err := state.graph.Incoming(out)
 		if err != nil {
-			return errors.Wrapf(err, "finishing node %q", node)
+			return fmt.Errorf("finishing node %q: %w", node, err)
 		}
 
 		// given all the incoming nodes into "out" are now completed
@@ -373,7 +373,7 @@ func (r *Repository) handleFailure(state runState, node *adagio.Node, src map[gr
 
 		outgoing, err := state.graph.Outgoing(out)
 		if err != nil {
-			return errors.Wrapf(err, "finishing node %q", node)
+			return fmt.Errorf("finishing node %q: %w", node, err)
 		}
 
 		// descend into child nodes
@@ -434,7 +434,7 @@ func (r *Repository) UnsubscribeAll(_ context.Context, agent *adagio.Agent, even
 func (r *Repository) state(runID string) (runState, error) {
 	state, ok := r.runs[runID]
 	if !ok {
-		return runState{}, errors.Wrapf(adagio.ErrRunDoesNotExist, "in-memory repository: run %q", runID)
+		return runState{}, fmt.Errorf("in-memory repository: run %q: %w", runID, adagio.ErrRunDoesNotExist)
 	}
 
 	return state, nil
@@ -443,7 +443,7 @@ func (r *Repository) state(runID string) (runState, error) {
 func node(state runState, name string) (*adagio.Node, error) {
 	node, ok := state.lookup[name]
 	if !ok {
-		return nil, errors.Wrapf(adagio.ErrMissingNode, "in-memory repository: node %q", name)
+		return nil, fmt.Errorf("in-memory repository: node %q: %w", name, adagio.ErrMissingNode)
 	}
 
 	return node, nil
