@@ -20,7 +20,7 @@
             <b-navbar-item href="#">
               About
             </b-navbar-item>
-            <b-navbar-item href="#">
+            <b-navbar-item href="https://docs.adagio.run">
               Documentation
             </b-navbar-item>
           </b-navbar-dropdown>
