@@ -1,0 +1,21 @@
+---
+name: Build and Test
+on: [pull_request]
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Go 1.13
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.13
+      id: go
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v1
+    - name: Build
+      run: make install
+    - name: Start etcd
+      run: docker-compose run -p 0.0.0.0:2379:2379 -d etcd
+    - name: Run All Tests
+      run: make test-with-integrations
